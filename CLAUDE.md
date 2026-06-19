@@ -45,12 +45,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
                          src/domain/interface/ 放所有對外介面（一介面一檔）
 ```
 
-- **Domain（核心）**：實體、value object、領域邏輯（指標計算引擎，純函式、可 TDD），以及**所有對外介面**——集中在 `src/domain/interface/`（一個介面一個檔案）。**Domain 不 import 任何其他層**（不認識 HTTP、Hyperliquid、Prisma…）。
-- **Application** 依賴 Domain：編排用例，透過 domain 的介面取用 repository/proxy/client。
-- **Controller** 依賴 Application（與 domain 型別）：只負責 HTTP 請求/回應轉換。
-- **Infrastructure**（Repository / Client / Proxy 的**實作**）依賴 Domain：實作 `domain/interface/` 的介面（DIP——細節依賴抽象，抽象不依賴細節）。
-- 具體實作在組裝根（composition root：`main.ts` / `server.ts`）注入。
-- 指標計算引擎為純函式、不碰 I/O。背景流程（與查詢解耦）：`SyncLeaderboard` → `PollTrader`（BullMQ 排程）→ `RecomputeTraderMetrics`；查詢端只讀算好的 `trader_metrics`。
+- **Domain（核心）**：entity、value object、領域計算邏輯、**Domain Service**，以及**所有對外介面**（集中在 `src/domain/interface/`，一介面一檔）。**Domain 不 import 任何其他層**（不認識 HTTP、Hyperliquid、Prisma…）。
+- **Application** 依賴 Domain：呼叫 **Domain Service** 編排用例，拿回 **DTO**（不碰 entity）。
+- **Controller** 依賴 Application：只負責 HTTP 請求/回應轉換。
+- **Infrastructure**（Repository / Client / Proxy 的**實作**）依賴 Domain：實作 `domain/interface/` 的介面（DIP——細節依賴抽象）。
+- 具體實作在組裝根（`main.ts` / `server.ts`）注入。
+
+### Domain 內部結構
+
+- `entity/` — 實體（domain 物件；**非 `Dto` 結尾即視為 entity**）。**entity 絕不直接回傳給 application。**
+- `dto/` — Domain DTO：domain 對 application 的**唯一回傳形狀**（多轉一層，不外漏 entity）。
+- `service/` — **Domain Service**：application 的唯一呼叫入口。透過 `interface/` 的 repository/proxy 介面取得 entity、執行計算邏輯，再把 entity **轉成 DTO** 回傳。
+- `interface/` — repository / proxy 介面（一介面一檔）。
+- 計算邏輯歸 Domain Service（其內部可呼叫純計算 helper）。
+
+**呼叫鏈**：`Application → DomainService → repository 介面（impl 在 infra）→ entity → service 轉 DTO → 回傳 DTO`。Application 全程不碰 entity。背景流程：`SyncLeaderboardService` → `PollTraderService`（BullMQ 排程）→ `RecomputeTraderMetricsService`。
 
 > **不使用「port」一詞或資料夾**——對外介面一律稱「介面」，集中在 `src/domain/interface/`。
 
@@ -69,19 +78,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   純 domain 計算函式（如 `src/domain/metrics/` 的 `compute*`）維持函式命名；當把編排邏輯包成 domain service 物件時才加 `Service` 後綴。
 
-- **資料物件命名**：
+- **資料物件命名**（domain model 只有 entity 與 dto 兩種）：
   | 類別 | 規則 |
   | :--- | :--- |
-  | DTO（跨邊界傳輸的資料物件，含外部 API 原始形狀、HTTP 回應）| `Dto` 後綴 |
-  | Endpoint 接收的物件（querystring / params / body）| `Request` 後綴 |
-  | Entity（我們的 domain 物件）| 以領域語彙命名（不加 `Dto`/`Request`）|
+  | Entity（domain 物件）| 以領域語彙命名，**不加 `Dto`**（非 `Dto` 結尾即 entity）；放 `domain/entity/` |
+  | Domain DTO（service 回傳給 application 的形狀）| `Dto` 後綴；放 `domain/dto/` |
+  | Endpoint 接收的物件（querystring / params / body）| `Request` 後綴；放 controller 旁 |
 
-  這些資料物件一律是 **`type`**（見下），回應直接回傳、不另立 `Response` 型別。例：`TraderRiskDto`（回應）、`RiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity）。
+  這些資料物件一律是 **`type`**，回應直接回傳、不另立 `Response` 型別。例：`TraderRiskDto`（service 回傳）、`RiskRankingRequest`（入站查詢）。
 
 - **`interface` 只用於「行為契約」**（會被 class 實作或被注入的相依）：如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`IPositionRepository`。一律 `I` 前綴，**集中放在 `src/domain/interface/`，一個介面一個檔案（鐵則）**。**實例檔（class / 函式模組）內不得宣告任何 `interface`。不使用「port」一詞或資料夾。**
 - **資料形狀一律用 `type`，不用 `interface`、不加 `I`**：entity / value object / DTO / Request（如 `ReconstructedPosition`、`TraderRiskSummary`、`TraderRiskDto`、`RiskRankingRequest`）。
 - **固定資料形狀優先以泛型帶入契約**，而非為其定義具名資料介面：如 `IRepository<TEntity>`、`IResponse<TData>`。
-- **Presentation DTO 屬 delivery 細節**：放在 controller 旁（`type`），domain 不認識。
+- **DTO 是 domain 的回傳邊界**：Domain Service 把 entity 轉成 DTO（`domain/dto/`，`type`、`Dto` 結尾）回傳給 application；**entity 不可外漏到 application/controller。**
 - **外部 wire / vendor 形狀屬 infrastructure**：放在邊際層（`type`）；若外部 library 自帶型別，**只有邊際層依賴它**，domain 永不接觸。
 - **具體實作用「純角色名」**：實作不帶 `I`、**也不帶技術前綴**（class 名與檔名都是）。例：`ITraderMetricsRepository` 的實作是 `TraderMetricsRepository`（**不是** `PrismaTraderMetricsRepository`）；`IHyperliquidProxy` 的實作是 `HyperliquidProxy`（**不是** `HyperliquidHttpProxy`）。
 - **檔名必須對齊其主要型別/符號**（嚴格）：
