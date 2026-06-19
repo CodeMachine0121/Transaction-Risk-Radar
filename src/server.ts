@@ -1,11 +1,11 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { TraderMetricsRepository } from './application/ports/traderMetricsRepository';
+import type { ITraderMetricsRepository } from './application/ports/traderMetricsRepository';
 import { RiskRankingApplication } from './application/riskRankingApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { RiskRankingController } from './controller/riskRankingController';
 import { TraderDetailController } from './controller/traderDetailController';
 
-export interface BuildServerOptions {
+export interface IBuildServerOptions {
   logger?: boolean;
 }
 
@@ -14,8 +14,8 @@ export interface BuildServerOptions {
  * repository 為介面，由呼叫端（組裝根或測試）決定具體實作（DIP）。
  */
 export function buildServer(
-  repository: TraderMetricsRepository,
-  options: BuildServerOptions = {},
+  repository: ITraderMetricsRepository,
+  options: IBuildServerOptions = {},
 ): FastifyInstance {
   const server = Fastify({ logger: options.logger ?? false });
 

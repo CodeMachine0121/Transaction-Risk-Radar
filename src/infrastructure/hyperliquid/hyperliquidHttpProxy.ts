@@ -1,20 +1,20 @@
 import Decimal from 'decimal.js';
 import type {
-  HyperliquidProxy,
-  LeaderboardTrader,
-  OpenPosition,
-  TraderFill,
+  IHyperliquidProxy,
+  ILeaderboardTrader,
+  IOpenPosition,
+  ITraderFill,
 } from '../../application/ports/hyperliquidProxy';
 
 // Hyperliquid 原始回應形狀（僅取本專案需要的欄位）。
-interface RawLeaderboardRow {
+interface IRawLeaderboardRow {
   ethAddress: string;
   accountValue: string;
 }
-interface RawLeaderboardResponse {
-  leaderboardRows: RawLeaderboardRow[];
+interface IRawLeaderboardResponse {
+  leaderboardRows: IRawLeaderboardRow[];
 }
-interface RawPosition {
+interface IRawPosition {
   coin: string;
   szi: string;
   entryPx: string;
@@ -23,10 +23,10 @@ interface RawPosition {
   positionValue: string;
   marginUsed: string;
 }
-interface RawClearinghouseState {
-  assetPositions: { position: RawPosition }[];
+interface IRawClearinghouseState {
+  assetPositions: { position: IRawPosition }[];
 }
-interface RawFill {
+interface IRawFill {
   coin: string;
   px: string;
   sz: string;
@@ -39,38 +39,38 @@ interface RawFill {
   tid: number;
 }
 
-export interface HyperliquidHttpProxyOptions {
+export interface IHyperliquidHttpProxyOptions {
   infoApiBaseUrl: string;
   statsDataBaseUrl: string;
   fetchFunction?: typeof fetch;
 }
 
 /** Proxy：以 HTTP 呼叫 Hyperliquid 公開讀取 API，並正規化為 domain/application 使用的型別。 */
-export class HyperliquidHttpProxy implements HyperliquidProxy {
+export class HyperliquidHttpProxy implements IHyperliquidProxy {
   private readonly infoApiBaseUrl: string;
   private readonly statsDataBaseUrl: string;
   private readonly fetchFunction: typeof fetch;
 
-  constructor(options: HyperliquidHttpProxyOptions) {
+  constructor(options: IHyperliquidHttpProxyOptions) {
     this.infoApiBaseUrl = options.infoApiBaseUrl;
     this.statsDataBaseUrl = options.statsDataBaseUrl;
     this.fetchFunction = options.fetchFunction ?? globalThis.fetch;
   }
 
-  async fetchLeaderboard(): Promise<LeaderboardTrader[]> {
+  async fetchLeaderboard(): Promise<ILeaderboardTrader[]> {
     const response = await this.fetchFunction(`${this.statsDataBaseUrl}/Mainnet/leaderboard`);
     if (!response.ok) {
       throw new Error(`Hyperliquid leaderboard request failed with status ${response.status}`);
     }
-    const data = (await response.json()) as RawLeaderboardResponse;
+    const data = (await response.json()) as IRawLeaderboardResponse;
     return data.leaderboardRows.map((row) => ({
       address: row.ethAddress,
       accountValue: new Decimal(row.accountValue),
     }));
   }
 
-  async fetchOpenPositions(address: string): Promise<OpenPosition[]> {
-    const data = await this.postInfo<RawClearinghouseState>({
+  async fetchOpenPositions(address: string): Promise<IOpenPosition[]> {
+    const data = await this.postInfo<IRawClearinghouseState>({
       type: 'clearinghouseState',
       user: address,
     });
@@ -85,8 +85,8 @@ export class HyperliquidHttpProxy implements HyperliquidProxy {
     }));
   }
 
-  async fetchUserFills(address: string, startTime: number): Promise<TraderFill[]> {
-    const data = await this.postInfo<RawFill[]>({
+  async fetchUserFills(address: string, startTime: number): Promise<ITraderFill[]> {
+    const data = await this.postInfo<IRawFill[]>({
       type: 'userFillsByTime',
       user: address,
       startTime,

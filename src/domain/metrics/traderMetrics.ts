@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { computeAveragingDownRatio, detectAveragingDown } from './averagingDown';
-import type { PositionLifecycleEvent, PositionSide } from './averagingDown';
+import type { IPositionLifecycleEvent, PositionSide } from './averagingDown';
 import {
   computeMaxAdverseExcursionPercentile90,
   computeMaxAdverseExcursionPerPosition,
@@ -9,30 +9,30 @@ import { normalize } from './normalize';
 import { computeRealizedProfitAndLoss, computeWinRate } from './profitAndLoss';
 import { computeReturnDownsideDeviation } from './returnDownsideDeviation';
 import { computeRiskScore, DEFAULT_RISK_SCORE_WEIGHTS } from './riskScore';
-import type { RiskScoreWeights } from './riskScore';
+import type { IRiskScoreWeights } from './riskScore';
 import { computeTrapSignal } from './trapSignal';
 
 /** 已平倉位的結算資訊（近 90 天時間窗內）。 */
-export interface ClosedPositionResult {
+export interface IClosedPositionResult {
   realizedReturnPercentage: Decimal;
   realizedProfitAndLoss: Decimal;
 }
 
 /** 一個交易員的單一倉位輸入（已由 repository 整理好）。 */
-export interface TraderPositionInput {
+export interface ITraderPositionInput {
   side: PositionSide;
-  events: PositionLifecycleEvent[];
+  events: IPositionLifecycleEvent[];
   unrealizedProfitAndLossPercentages: Decimal[];
   averageLeverage: Decimal;
-  closed: ClosedPositionResult | null;
+  closed: IClosedPositionResult | null;
 }
 
-export interface TraderMetricsInput {
-  positions: TraderPositionInput[];
+export interface ITraderMetricsInput {
+  positions: ITraderPositionInput[];
   minimumClosedPositions?: number;
 }
 
-export interface TraderMetricsResult {
+export interface ITraderMetricsResult {
   insufficientData: boolean;
   closedPositionCount: number;
   maxAdverseExcursionPercentile90: Decimal | null;
@@ -56,12 +56,12 @@ const DEFAULT_MINIMUM_CLOSED_POSITIONS = 20;
  * 已平倉位數低於門檻時標記 insufficientData 並不給 riskScore（避免少量幸運單騙過系統）。
  */
 export function computeTraderMetrics(
-  input: TraderMetricsInput,
-  weights: RiskScoreWeights = DEFAULT_RISK_SCORE_WEIGHTS,
-): TraderMetricsResult {
+  input: ITraderMetricsInput,
+  weights: IRiskScoreWeights = DEFAULT_RISK_SCORE_WEIGHTS,
+): ITraderMetricsResult {
   const minimumClosedPositions = input.minimumClosedPositions ?? DEFAULT_MINIMUM_CLOSED_POSITIONS;
   const closedPositions = input.positions.filter(
-    (position): position is TraderPositionInput & { closed: ClosedPositionResult } =>
+    (position): position is ITraderPositionInput & { closed: IClosedPositionResult } =>
       position.closed !== null,
   );
   const closedPositionCount = closedPositions.length;

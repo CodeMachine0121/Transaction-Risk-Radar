@@ -2,11 +2,11 @@ import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
 import {
   assembleTraderPositionInputs,
-  type AssemblyPosition,
+  type IAssemblyPosition,
 } from '@/domain/assembly/assembleTraderPositionInputs';
-import type { ReconstructedPosition } from '@/domain/reconstruction/reconstructPositions';
+import type { IReconstructedPosition } from '@/domain/reconstruction/reconstructPositions';
 
-const reconstructed = (overrides: Partial<ReconstructedPosition> = {}): ReconstructedPosition => ({
+const reconstructed = (overrides: Partial<IReconstructedPosition> = {}): IReconstructedPosition => ({
   coin: 'ETH',
   side: 'long',
   events: [{ type: 'open', price: new Decimal(100), size: new Decimal(1) }],
@@ -16,7 +16,7 @@ const reconstructed = (overrides: Partial<ReconstructedPosition> = {}): Reconstr
   ...overrides,
 });
 
-const snapshot = (unrealized: number, leverage: number): AssemblyPosition['snapshots'][number] => ({
+const snapshot = (unrealized: number, leverage: number): IAssemblyPosition['snapshots'][number] => ({
   unrealizedProfitAndLossPercentage: new Decimal(unrealized),
   leverage: new Decimal(leverage),
 });

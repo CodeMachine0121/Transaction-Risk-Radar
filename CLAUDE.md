@@ -73,7 +73,8 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
   | Endpoint 接收的物件（querystring / params / body）| `Request` 後綴 |
   | Entity（我們的 domain 物件）| 以領域語彙命名（不加 `Dto`/`Request`）|
 
-  回應直接以 `Dto` 回傳，不另立 `Response` 型別。例：`TraderRiskDto`（回應）、`RiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity）。
+  回應直接以 `Dto` 回傳，不另立 `Response` 型別。例：`ITraderRiskDto`（回應）、`IRiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity，`type` 別名）。
+- **介面一律以 `I` 前綴命名**：所有 `interface` 宣告皆加 `I`（如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`ITraderRiskDto`）。對應的具體實作 / 實例用**不帶 `I`** 的名稱（如 `PrismaTraderMetricsRepository`、`HyperliquidHttpProxy`）。`type` 別名（如 `PositionSide`、`TraderRiskSummary`）不加 `I`。
 - **TypeScript 禁用 `any` 與 `unknown`。** 一律給出明確型別。
 - **禁止「先宣告後賦值」。** 變數必須在宣告當下即賦值（不可先 `let x;` 之後再指派）。
 - **嚴禁 `private static` method。** 視為 code smell——應抽到對應物件成為其 instance method，透過實例呼叫。**單元測試除外。**

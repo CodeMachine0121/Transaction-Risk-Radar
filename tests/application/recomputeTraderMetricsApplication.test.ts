@@ -1,12 +1,12 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
-import type { TraderMetricsWriter } from '@/application/ports/traderMetricsWriter';
-import type { TraderPositionRepository } from '@/application/ports/traderPositionRepository';
+import type { ITraderMetricsWriter } from '@/application/ports/traderMetricsWriter';
+import type { ITraderPositionRepository } from '@/application/ports/traderPositionRepository';
 import { RecomputeTraderMetricsApplication } from '@/application/recomputeTraderMetricsApplication';
-import type { AssemblyPosition } from '@/domain/assembly/assembleTraderPositionInputs';
-import type { TraderMetricsResult } from '@/domain/metrics/traderMetrics';
+import type { IAssemblyPosition } from '@/domain/assembly/assembleTraderPositionInputs';
+import type { ITraderMetricsResult } from '@/domain/metrics/traderMetrics';
 
-const assemblyPosition = (isClosed: boolean, hasSnapshot: boolean): AssemblyPosition => ({
+const assemblyPosition = (isClosed: boolean, hasSnapshot: boolean): IAssemblyPosition => ({
   reconstructed: {
     coin: 'ETH',
     side: 'long',
@@ -20,15 +20,15 @@ const assemblyPosition = (isClosed: boolean, hasSnapshot: boolean): AssemblyPosi
     : [],
 });
 
-const createPositionRepository = (): TraderPositionRepository => ({
+const createPositionRepository = (): ITraderPositionRepository => ({
   findAssemblyPositions: vi
-    .fn<(traderAddress: string) => Promise<AssemblyPosition[]>>()
+    .fn<(traderAddress: string) => Promise<IAssemblyPosition[]>>()
     .mockResolvedValue([]),
 });
 
-const createMetricsWriter = (): TraderMetricsWriter => ({
+const createMetricsWriter = (): ITraderMetricsWriter => ({
   saveTraderMetrics: vi
-    .fn<(traderAddress: string, metrics: TraderMetricsResult) => Promise<void>>()
+    .fn<(traderAddress: string, metrics: ITraderMetricsResult) => Promise<void>>()
     .mockResolvedValue(undefined),
 });
 

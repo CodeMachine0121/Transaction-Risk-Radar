@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 
 export type PositionSide = 'long' | 'short';
 
-export interface PositionLifecycleEvent {
+export interface IPositionLifecycleEvent {
   type: 'open' | 'add' | 'reduce' | 'close';
   price: Decimal;
   size: Decimal;
@@ -14,7 +14,7 @@ export interface PositionLifecycleEvent {
  * （多單加在低於均價、空單加在高於均價）時，視為「往虧損裡加倉」→ 判定為攤平。
  * 僅 open / add 計入均價；reduce / close 不改變平均進場價。
  */
-export function detectAveragingDown(side: PositionSide, events: PositionLifecycleEvent[]): boolean {
+export function detectAveragingDown(side: PositionSide, events: IPositionLifecycleEvent[]): boolean {
   let entryCost = new Decimal(0);
   let entrySize = new Decimal(0);
 

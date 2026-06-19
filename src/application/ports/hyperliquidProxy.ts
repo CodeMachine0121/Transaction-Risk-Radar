@@ -1,13 +1,13 @@
 import type Decimal from 'decimal.js';
 
 /** Leaderboard 上的一位交易員（已正規化）。 */
-export interface LeaderboardTrader {
+export interface ILeaderboardTrader {
   address: string;
   accountValue: Decimal;
 }
 
 /** 一筆成交（已正規化；金額/數量皆為 Decimal）。 */
-export interface TraderFill {
+export interface ITraderFill {
   coin: string;
   price: Decimal;
   size: Decimal;
@@ -24,7 +24,7 @@ export interface TraderFill {
 }
 
 /** 一個開倉的當前快照（已正規化）。 */
-export interface OpenPosition {
+export interface IOpenPosition {
   coin: string;
   /** 帶號持倉量：正=多、負=空。 */
   signedSize: Decimal;
@@ -39,8 +39,8 @@ export interface OpenPosition {
  * Proxy port：封裝 Hyperliquid 公開讀取 API（leaderboard / clearinghouseState / userFillsByTime）。
  * application 只依賴此介面；HTTP 細節由 infrastructure 的具體 Proxy 實作（DIP）。
  */
-export interface HyperliquidProxy {
-  fetchLeaderboard(): Promise<LeaderboardTrader[]>;
-  fetchOpenPositions(address: string): Promise<OpenPosition[]>;
-  fetchUserFills(address: string, startTime: number): Promise<TraderFill[]>;
+export interface IHyperliquidProxy {
+  fetchLeaderboard(): Promise<ILeaderboardTrader[]>;
+  fetchOpenPositions(address: string): Promise<IOpenPosition[]>;
+  fetchUserFills(address: string, startTime: number): Promise<ITraderFill[]>;
 }

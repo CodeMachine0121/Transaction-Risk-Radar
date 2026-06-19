@@ -1,8 +1,8 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { computeTraderMetrics, type TraderPositionInput } from '@/domain/metrics/traderMetrics';
+import { computeTraderMetrics, type ITraderPositionInput } from '@/domain/metrics/traderMetrics';
 
-const longPosition = (overrides: Partial<TraderPositionInput> = {}): TraderPositionInput => ({
+const longPosition = (overrides: Partial<ITraderPositionInput> = {}): ITraderPositionInput => ({
   side: 'long',
   events: [{ type: 'open', price: new Decimal(100), size: new Decimal(1) }],
   unrealizedProfitAndLossPercentages: [new Decimal(-5)],

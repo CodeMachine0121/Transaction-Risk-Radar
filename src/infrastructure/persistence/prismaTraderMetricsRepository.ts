@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient, TraderMetrics } from '@prisma/client';
-import type { TraderMetricsRepository } from '../../application/ports/traderMetricsRepository';
+import type { ITraderMetricsRepository } from '../../application/ports/traderMetricsRepository';
 import type { TraderRiskSummary } from '../../domain/ranking/traderRiskSummary';
 
 const toDomainDecimal = (value: { toString(): string } | null): Decimal | null =>
@@ -21,7 +21,7 @@ const toTraderRiskSummary = (row: TraderMetrics): TraderRiskSummary => ({
 });
 
 /** Repository：以 Prisma Client 讀取 trader_metrics，並將 Prisma.Decimal 轉為 domain 的 decimal.js Decimal。 */
-export class PrismaTraderMetricsRepository implements TraderMetricsRepository {
+export class PrismaTraderMetricsRepository implements ITraderMetricsRepository {
   private readonly prismaClient: PrismaClient;
 
   constructor(prismaClient: PrismaClient) {

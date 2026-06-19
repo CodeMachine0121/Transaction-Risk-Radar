@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 
 /** 已正規化（皆為 0~1）的五項危險因子。 */
-export interface RiskScoreComponents {
+export interface IRiskScoreComponents {
   normalizedMaxAdverseExcursion: Decimal;
   averagingDownRatio: Decimal;
   trapSignal: Decimal;
@@ -10,7 +10,7 @@ export interface RiskScoreComponents {
 }
 
 /** 各危險因子的權重，總和應為 1。 */
-export interface RiskScoreWeights {
+export interface IRiskScoreWeights {
   maxAdverseExcursion: Decimal;
   averagingDown: Decimal;
   trapSignal: Decimal;
@@ -19,7 +19,7 @@ export interface RiskScoreWeights {
 }
 
 /** PRD 第 4 章定義的預設權重（總和 = 1）。 */
-export const DEFAULT_RISK_SCORE_WEIGHTS: RiskScoreWeights = {
+export const DEFAULT_RISK_SCORE_WEIGHTS: IRiskScoreWeights = {
   maxAdverseExcursion: new Decimal('0.30'),
   averagingDown: new Decimal('0.25'),
   trapSignal: new Decimal('0.15'),
@@ -34,8 +34,8 @@ const RISK_SCORE_SCALE = new Decimal(100);
  * 刻意不獎勵報酬率——衡量的是「拿小本金跟單有多危險」。
  */
 export function computeRiskScore(
-  components: RiskScoreComponents,
-  weights: RiskScoreWeights = DEFAULT_RISK_SCORE_WEIGHTS,
+  components: IRiskScoreComponents,
+  weights: IRiskScoreWeights = DEFAULT_RISK_SCORE_WEIGHTS,
 ): Decimal {
   const weightedSum = components.normalizedMaxAdverseExcursion
     .times(weights.maxAdverseExcursion)

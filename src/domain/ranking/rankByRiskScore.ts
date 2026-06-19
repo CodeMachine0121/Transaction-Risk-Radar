@@ -3,7 +3,7 @@ import type { TraderRiskSummary } from './traderRiskSummary';
 
 export type RiskRankingDirection = 'ascending' | 'descending';
 
-export interface RiskRankingQuery {
+export interface IRiskRankingQuery {
   direction?: RiskRankingDirection;
   offset?: number;
   limit?: number;
@@ -18,7 +18,7 @@ const DEFAULT_LIMIT = 50;
  */
 export function rankTradersByRiskScore(
   traders: TraderRiskSummary[],
-  query: RiskRankingQuery = {},
+  query: IRiskRankingQuery = {},
 ): TraderRiskSummary[] {
   const direction = query.direction ?? 'ascending';
   const offset = query.offset ?? 0;

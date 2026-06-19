@@ -1,9 +1,9 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import type { TraderFill } from '@/application/ports/hyperliquidProxy';
+import type { ITraderFill } from '@/application/ports/hyperliquidProxy';
 import { reconstructPositions } from '@/domain/reconstruction/reconstructPositions';
 
-interface FillSpec {
+interface IFillSpec {
   side: 'buy' | 'sell';
   price: number;
   size: number;
@@ -13,7 +13,7 @@ interface FillSpec {
   coin?: string;
 }
 
-const fill = (spec: FillSpec): TraderFill => ({
+const fill = (spec: IFillSpec): ITraderFill => ({
   coin: spec.coin ?? 'ETH',
   price: new Decimal(spec.price),
   size: new Decimal(spec.size),
