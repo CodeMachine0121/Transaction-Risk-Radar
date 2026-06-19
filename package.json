@@ -1,0 +1,38 @@
+{
+  "name": "trader-risk-radar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Risk-oriented analysis and ranking API for Hyperliquid on-chain perpetual traders",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts",
+    "start": "bun run src/main.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.1.0",
+    "decimal.js": "^10.4.3",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.4.2",
+    "prisma": "^6.1.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  }
+}

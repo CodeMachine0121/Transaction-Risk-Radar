@@ -1,0 +1,111 @@
+// Trader Risk Radar — code-first schema (single source of truth for the data model).
+// 命名遵循 .sdd/UL-MAP.md：model PascalCase、欄位 camelCase，對應 DB 為 snake_case 全名。
+// 金額 / 報酬率一律使用 Decimal，禁用浮點。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PositionEventType {
+  open
+  add
+  reduce
+  close
+}
+
+enum PositionStatus {
+  open
+  closed
+}
+
+enum PositionSide {
+  long
+  short
+}
+
+/// 被追蹤分析的鏈上交易員（錢包地址），來源為 Hyperliquid leaderboard。
+model Trader {
+  address     String   @id
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  positions Position[]
+  metrics   TraderMetrics?
+
+  @@map("traders")
+}
+
+/// 交易員針對某一標的的一筆持倉，具生命週期：開倉 → (加倉/減倉)* → 平倉。
+model Position {
+  id            String         @id @default(uuid())
+  traderAddress String         @map("trader_address")
+  coin          String
+  side          PositionSide
+  status        PositionStatus @default(open)
+  openedAt      DateTime       @map("opened_at")
+  closedAt      DateTime?      @map("closed_at")
+
+  trader    Trader             @relation(fields: [traderAddress], references: [address])
+  events    PositionEvent[]
+  snapshots PositionSnapshot[]
+
+  @@index([traderAddress])
+  @@map("positions")
+}
+
+/// 倉位生命週期中的每一個動作（開/加/減/平），是偵測攤平行為的依據。
+model PositionEvent {
+  id          String            @id @default(uuid())
+  positionId  String            @map("position_id")
+  // Hyperliquid 成交唯一識別，用於去重 (idempotency)。
+  fillId      String            @unique @map("fill_id")
+  type        PositionEventType
+  price       Decimal           @db.Decimal(38, 18)
+  size        Decimal           @db.Decimal(38, 18)
+  leverage    Decimal           @db.Decimal(18, 4)
+  occurredAt  DateTime          @map("occurred_at")
+
+  position Position @relation(fields: [positionId], references: [id])
+
+  @@index([positionId])
+  @@map("position_events")
+}
+
+/// 每次輪詢對每個開倉拍下的時間切片，是計算 MAE 的依據。
+model PositionSnapshot {
+  id                                String   @id @default(uuid())
+  positionId                        String   @map("position_id")
+  markPrice                         Decimal  @map("mark_price") @db.Decimal(38, 18)
+  unrealizedProfitAndLossPercentage Decimal  @map("unrealized_profit_and_loss_percentage") @db.Decimal(18, 8)
+  margin                            Decimal  @db.Decimal(38, 18)
+  capturedAt                        DateTime @map("captured_at")
+
+  position Position @relation(fields: [positionId], references: [id])
+
+  @@index([positionId, capturedAt])
+  @@map("position_snapshots")
+}
+
+/// 交易員經分析引擎計算後的彙總指標集（見 PRD 第 4 章公式）。
+model TraderMetrics {
+  traderAddress                   String   @id @map("trader_address")
+  maxAdverseExcursionPercentile90 Decimal? @map("max_adverse_excursion_percentile_90") @db.Decimal(18, 8)
+  averagingDownRatio              Decimal? @map("averaging_down_ratio") @db.Decimal(9, 8)
+  winRate                         Decimal? @map("win_rate") @db.Decimal(9, 8)
+  returnDownsideDeviation         Decimal? @map("return_downside_deviation") @db.Decimal(18, 8)
+  averageLeverage                 Decimal? @map("average_leverage") @db.Decimal(18, 4)
+  trapSignal                      Decimal? @map("trap_signal") @db.Decimal(9, 8)
+  riskScore                       Decimal? @map("risk_score") @db.Decimal(9, 4)
+  closedPositionCount             Int      @default(0) @map("closed_position_count")
+  insufficientData                Boolean  @default(true) @map("insufficient_data")
+  computedAt                      DateTime @updatedAt @map("computed_at")
+
+  trader Trader @relation(fields: [traderAddress], references: [address])
+
+  @@map("trader_metrics")
+}

@@ -69,11 +69,23 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
 
 ## Commands
 
-> 專案尚在 scaffold 階段；下列為依規範**應提供**的 npm scripts，建立 `package.json` 時請對齊命名：
+套件管理與執行一律使用 **Bun**。
 
-- `npm run lint` — ESLint 檢查
-- `npm run typecheck` — `tsc --noEmit`
-- `npm test` — 單元測試
-- 執行單一測試：依所選 test runner（如 Vitest：`npx vitest run <path>`；Jest：`npx jest <path>`）
+- `bun install` — 安裝依賴
+- `bun run dev` — 開發模式（watch）啟動 Fastify server
+- `bun run start` — 啟動 server
+- `bun run lint` / `bun run lint:fix` — ESLint
+- `bun run typecheck` — `tsc --noEmit`
+- `bun run format` / `bun run format:check` — Prettier
+- `bun run test` — 跑全部單元測試（Vitest）
+- `bun run test:watch` — watch 模式
+- 執行單一測試檔：`bunx vitest run src/path/to/file.test.ts`
+- `bun run db:generate` — `prisma generate`
+- `bun run db:migrate` — `prisma migrate dev`（code-first migration）
 
-（建立工具鏈後請回填實際指令並移除本註記。）
+> 環境變數見 `.env.example`（複製為 `.env`）。Prisma 指令需要 `DATABASE_URL`。
+
+## Layout
+
+`src/` 依分層架構組織，各層職責見其 `README.md`：
+`src/controller/`（Fastify 路由）· `src/application/`（用例編排）· `src/domain/`（指標計算引擎，純邏輯）· `src/infrastructure/`（Prisma repository + Hyperliquid proxy）· `src/shared/`（跨層工具）· `src/main.ts`（組裝根 / server bootstrap）。

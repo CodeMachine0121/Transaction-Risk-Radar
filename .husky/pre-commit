@@ -1,0 +1,5 @@
+echo "▶ pre-commit: ESLint"
+bun run lint || exit 1
+
+echo "▶ pre-commit: TypeScript type check"
+bun run typecheck || exit 1
