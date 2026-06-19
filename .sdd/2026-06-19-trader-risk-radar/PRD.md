@@ -86,7 +86,10 @@ synchronizeLeaderboard ──▶ traders
 
 3. **盈虧與勝率（近 90 天）**
    ```
-   realizedReturnPercentagePerPosition = 單一已平倉位的已實現報酬率
+   realizedReturnPercentagePerPosition = 單一已平倉位的已實現報酬率（ROI 法）
+                                       = realizedProfitAndLoss / 進場總成本 × 100
+                                         進場總成本 = Σ(進場 open/add 事件的 price × size)
+                                         （與槓桿無關；leverage-agnostic）
    realizedProfitAndLoss               = sum(已平倉位的已實現盈虧)
    winRate                             = count(獲利已平倉位) / count(已平倉位)
    ```
@@ -137,6 +140,20 @@ synchronizeLeaderboard ──▶ traders
 8. **排序與樣本門檻**
    - `riskRanking` 預設由低到高（安全在前）；可切換 `descending`（黑名單）。
    - 已平倉位數 < `minimumClosedPositions`（預設 20）→ 標記 `insufficientData`，不給 `riskScore`、不納入排行主體。
+
+### Data Ingestion & 倉位重建（資料來源拆分）
+
+指標所需資料來自**兩條 Hyperliquid 來源**，於 repository 層按「交易員 × 標的（coin）」join：
+
+| 資料 | 來源 | 產出 |
+| :--- | :--- | :--- |
+| 倉位生命週期 events（open/add/reduce/close）、已實現盈虧、報酬率 | `userFillsByTime`（成交） | `position_events` + 每倉位 `realizedProfitAndLoss` / `realizedReturnPercentage` |
+| 浮虧時間序列（算 MAE） | 定時 poll `clearinghouseState` | `position_snapshots`（每次輪詢一筆 `unrealizedProfitAndLossPercentage`）|
+| 追蹤名單 | `leaderboard`（GET）| `traders` |
+
+**倉位重建（`reconstructPositions`，純 domain 邏輯）：** 將某交易員的 fills 依標的分組、按時間排序，追蹤帶號持倉量，逐筆分類為 open/add/reduce/close；持倉量歸零即為一個已閉倉位、反向穿越（sign flip）視為「平舊倉＋開新倉」。每倉位的 `realizedProfitAndLoss = Σ closedPnl`、`realizedReturnPercentage` 以 ROI 法計（見規則 3）。
+- 去重鍵：fill 的 `tid`。
+- **已知限制：** 假設每個標的的 fill 歷史從「無持倉」開始；若歷史被截斷（起始即有持倉）可能誤判首個殘缺倉位 → 攝取時應抓取足夠長的歷史。
 
 ### Edge Cases
 
