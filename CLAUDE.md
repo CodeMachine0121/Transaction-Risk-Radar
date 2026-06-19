@@ -55,6 +55,17 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
 ## Engineering Conventions（強制）
 
 - **命名一律全名，禁止任何縮寫。** 例：`maxAdverseExcursionPercentile90`、`weightReturnDownsideDeviation`、`realizedProfitAndLoss`——不可寫 `mae` / `pnl` / `w_lev`。程式識別字用 camelCase 全名；DB 表/欄用 snake_case 全名。
+- **各層角色用固定後綴命名，且只有這幾種角色**（除非未來要拆分 pattern，否則不出現 `Handler` / `Manager` 等其他角色詞）：
+  | 角色 | 後綴 | 層 |
+  | :--- | :--- | :--- |
+  | Domain service | `Service` | domain |
+  | Application | `Application` | application |
+  | Controller | `Controller` | controller |
+  | Repository | `Repository` | infrastructure |
+  | Client | `Client` | infrastructure |
+  | Proxy | `Proxy` | infrastructure |
+
+  純 domain 計算函式（如 `src/domain/metrics/` 的 `compute*`）維持函式命名；當把編排邏輯包成 domain service 物件時才加 `Service` 後綴。
 - **TypeScript 禁用 `any` 與 `unknown`。** 一律給出明確型別。
 - **禁止「先宣告後賦值」。** 變數必須在宣告當下即賦值（不可先 `let x;` 之後再指派）。
 - **嚴禁 `private static` method。** 視為 code smell——應抽到對應物件成為其 instance method，透過實例呼叫。**單元測試除外。**
