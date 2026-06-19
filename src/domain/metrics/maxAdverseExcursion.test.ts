@@ -1,6 +1,9 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { computeMaxAdverseExcursionPerPosition } from './maxAdverseExcursion';
+import {
+  computeMaxAdverseExcursionPercentile90,
+  computeMaxAdverseExcursionPerPosition,
+} from './maxAdverseExcursion';
 
 const toDecimals = (values: number[]): Decimal[] => values.map((value) => new Decimal(value));
 
@@ -22,5 +25,26 @@ describe('computeMaxAdverseExcursionPerPosition', () => {
 
   it('throws when there are no snapshots', () => {
     expect(() => computeMaxAdverseExcursionPerPosition([])).toThrow(RangeError);
+  });
+});
+
+describe('computeMaxAdverseExcursionPercentile90', () => {
+  it('returns the absolute MAE for a single position', () => {
+    const result = computeMaxAdverseExcursionPercentile90(toDecimals([-30]));
+    expect(result.toString()).toBe('30');
+  });
+
+  it('computes the 90th percentile of absolute MAE values with linear interpolation', () => {
+    const result = computeMaxAdverseExcursionPercentile90(toDecimals([-10, -20, -30, -40, -50]));
+    expect(result.toString()).toBe('46');
+  });
+
+  it('uses absolute values regardless of input ordering or sign', () => {
+    const result = computeMaxAdverseExcursionPercentile90(toDecimals([-50, 10]));
+    expect(result.toString()).toBe('46');
+  });
+
+  it('throws when there are no positions', () => {
+    expect(() => computeMaxAdverseExcursionPercentile90([])).toThrow(RangeError);
   });
 });
