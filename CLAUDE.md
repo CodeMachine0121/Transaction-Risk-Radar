@@ -53,9 +53,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Domain 內部結構
 
-domain **只依「種類」分這四個資料夾**，不出現 `market` / `assembly` / `metrics` / `reconstruction` 等概念資料夾：
+domain **只依「種類」分這五個資料夾**，不出現 `market` / `assembly` / `metrics` / `reconstruction` 等概念資料夾：
 
-- `entity/` — 實體（domain 物件；**非 `Dto` 結尾即視為 entity**）。**entity 絕不直接回傳給 application。**
+- `entity/` — 充血實體（`class`，含行為）。**entity 絕不直接回傳給 application。**
+- `vo/` — value object（不可變純資料、無行為，`type`）：如 proxy 正規化後的 `traderFill`、`openPosition`、`leaderboardTrader`、`positionSnapshotRecord`。
 - `dto/` — Domain DTO：domain 對 application 的**唯一回傳形狀**（多轉一層，不外漏 entity）。
 - `service/` — **Domain Service**：application 的唯一呼叫入口。透過 `interface/` 的 repository/proxy 介面取得 entity、執行計算邏輯，再把 entity **轉成 DTO** 回傳。命名 `XxxService`，**一個檔案只有一個 service class**。
 - `interface/` — repository / proxy 介面（一介面一檔）。
@@ -133,10 +134,17 @@ domain **只依「種類」分這四個資料夾**，不出現 `market` / `assem
 
 `src/` 依分層架構組織，各層職責見其 `README.md`：
 
-- `src/domain/`（核心，**只依種類分四個資料夾**）：`entity/`（充血 entity class）· `dto/`（回傳 DTO `type`）· `service/`（Domain Service，一檔一 class）· `interface/`（對外介面，一檔一介面）
+- `src/domain/`（核心，**只依種類分五個資料夾**）：`entity/`（充血 entity class）· `vo/`（value object `type`）· `dto/`（回傳 DTO `type`）· `service/`（Domain Service，一檔一 class）· `interface/`（對外介面，一檔一介面）
 - `src/application/`（用例編排，呼叫 domain service；**無 ports 資料夾**）
 - `src/controller/`（Fastify 路由 + Request `type`）
 - `src/infrastructure/`：`persistence/`（Prisma repository）· `hyperliquid/`（proxy + `hyperliquidWire` 原始型別）
 - `src/shared/`（跨層工具）· `src/main.ts` / `src/server.ts`（組裝根）
 
-**測試集中在 `tests/`**（不與原始碼並列），目錄結構鏡像 `src/`。測試一律用 **`@/` path alias** 匯入待測模組（`@/` → `src/`），例如 `import { normalize } from '@/domain/metrics/normalize'`；原始碼內部彼此仍用相對匯入。alias 同時設定於 `tsconfig.json`（`paths`）與 `vitest.config.ts`（`resolve.alias`）。
+**測試集中在 `tests/`**（不與原始碼並列），目錄結構鏡像 `src/`。測試一律用 **`@/` path alias** 匯入待測模組（`@/` → `src/`）；原始碼內部彼此仍用相對匯入。alias 同時設定於 `tsconfig.json`（`paths`）與 `vitest.config.ts`（`resolve.alias`）。
+
+## Testing 策略（強制）
+
+- **Entity**：直接單元測試（充血方法是核心計算邏輯）。
+- **Domain Service**：**不單獨測試、也不做 fake / mock**。它**沒有介面**，以**具體實例**注入 application。
+- **Application 測試**：注入**真實的 domain service（連帶真實 entity）**，**只 mock 最外層的介面**（repository / proxy / writer，用 `vi.fn`）。如此測 application 時會**連帶測到 domain service 與 entity**——這就是刻意的「測試力度放大」。
+- mock 一律針對**介面**（`vi.fn` + `mockResolvedValue`），**不手寫 fake 實作類別**。
