@@ -38,3 +38,16 @@ export function detectAveragingDown(side: PositionSide, events: PositionLifecycl
 
   return false;
 }
+
+/**
+ * 計算交易員的攤平比例：被判定為攤平的倉位數 / 總倉位數。
+ * 比例越高代表越偏馬丁格爾，是 riskScore 的危險因子之一。
+ * @param positionFlags 各倉位的 detectAveragingDown 結果
+ */
+export function computeAveragingDownRatio(positionFlags: boolean[]): Decimal {
+  if (positionFlags.length === 0) {
+    throw new RangeError('at least one position is required');
+  }
+  const flaggedCount = positionFlags.filter((isAveragingDown) => isAveragingDown).length;
+  return new Decimal(flaggedCount).dividedBy(positionFlags.length);
+}

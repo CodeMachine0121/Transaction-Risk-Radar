@@ -1,6 +1,10 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { detectAveragingDown, type PositionLifecycleEvent } from './averagingDown';
+import {
+  computeAveragingDownRatio,
+  detectAveragingDown,
+  type PositionLifecycleEvent,
+} from './averagingDown';
 
 const event = (
   type: PositionLifecycleEvent['type'],
@@ -37,5 +41,23 @@ describe('detectAveragingDown', () => {
   it('flags when any one of several adds is adverse', () => {
     const events = [event('open', 100, 1), event('add', 110, 1), event('add', 95, 1)];
     expect(detectAveragingDown('long', events)).toBe(true);
+  });
+});
+
+describe('computeAveragingDownRatio', () => {
+  it('returns the fraction of positions flagged as averaging down', () => {
+    expect(computeAveragingDownRatio([true, false, false, false]).toString()).toBe('0.25');
+  });
+
+  it('returns 1 when every position averages down', () => {
+    expect(computeAveragingDownRatio([true, true]).toString()).toBe('1');
+  });
+
+  it('returns 0 when no position averages down', () => {
+    expect(computeAveragingDownRatio([false, false, false]).toString()).toBe('0');
+  });
+
+  it('throws when there are no positions', () => {
+    expect(() => computeAveragingDownRatio([])).toThrow(RangeError);
   });
 });
