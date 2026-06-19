@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '@/server';
-import type { TraderRiskDto } from '@/controller/traderRiskDto';
+import type { TraderRiskDto } from '@/domain/dto/traderRiskDto';
 import {
-  buildSummary,
+  buildTrader,
   createMockTraderMetricsRepository,
 } from './application/support/mockTraderMetricsRepository';
 
@@ -19,9 +19,9 @@ afterEach(async () => {
 describe('HTTP API', () => {
   it('GET /rankings returns rankable traders ascending by risk score', async () => {
     const repository = createMockTraderMetricsRepository();
-    vi.mocked(repository.findRankableSummaries).mockResolvedValue([
-      buildSummary('A', 70),
-      buildSummary('B', 30),
+    vi.mocked(repository.findRankableTraders).mockResolvedValue([
+      buildTrader('A', 70),
+      buildTrader('B', 30),
     ]);
     server = buildServer(repository);
 
@@ -35,9 +35,9 @@ describe('HTTP API', () => {
 
   it('GET /rankings honours the direction query parameter', async () => {
     const repository = createMockTraderMetricsRepository();
-    vi.mocked(repository.findRankableSummaries).mockResolvedValue([
-      buildSummary('A', 70),
-      buildSummary('B', 30),
+    vi.mocked(repository.findRankableTraders).mockResolvedValue([
+      buildTrader('A', 70),
+      buildTrader('B', 30),
     ]);
     server = buildServer(repository);
 
@@ -49,7 +49,7 @@ describe('HTTP API', () => {
 
   it('GET /traders/:address returns the trader detail', async () => {
     const repository = createMockTraderMetricsRepository();
-    vi.mocked(repository.findSummaryByAddress).mockResolvedValue(buildSummary('A', 70));
+    vi.mocked(repository.findTraderByAddress).mockResolvedValue(buildTrader('A', 70));
     server = buildServer(repository);
 
     const response = await server.inject({ method: 'GET', url: '/traders/A' });
@@ -60,7 +60,7 @@ describe('HTTP API', () => {
 
   it('GET /traders/:address returns 404 when the trader is unknown', async () => {
     const repository = createMockTraderMetricsRepository();
-    vi.mocked(repository.findSummaryByAddress).mockResolvedValue(null);
+    vi.mocked(repository.findTraderByAddress).mockResolvedValue(null);
     server = buildServer(repository);
 
     const response = await server.inject({ method: 'GET', url: '/traders/Z' });

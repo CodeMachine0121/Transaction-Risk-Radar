@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { RiskRankingApplication } from '../application/riskRankingApplication';
-import type { RiskRankingQuery } from '../domain/ranking/rankByRiskScore';
-import { toTraderRiskDto, type TraderRiskDto } from './traderRiskDto';
+import type { TraderRiskDto } from '../domain/dto/traderRiskDto';
+import type { RiskRankingQuery } from '../domain/vo/riskRankingQuery';
 
 type RiskRankingRequest = {
   direction?: string;
@@ -33,7 +33,7 @@ const parseRankingQuery = (raw: RiskRankingRequest): RiskRankingQuery => {
   return query;
 };
 
-/** Controller：GET /rankings（風險導向排行，US-01）。 */
+/** Controller：GET /rankings（風險導向排行，US-01）。回傳 DTO（由 application/service 產出）。 */
 export class RiskRankingController {
   private readonly application: RiskRankingApplication;
 
@@ -44,10 +44,8 @@ export class RiskRankingController {
   register(server: FastifyInstance): void {
     server.get<{ Querystring: RiskRankingRequest }>(
       '/rankings',
-      async (request): Promise<TraderRiskDto[]> => {
-        const ranking = await this.application.listRanking(parseRankingQuery(request.query));
-        return ranking.map(toTraderRiskDto);
-      },
+      (request): Promise<TraderRiskDto[]> =>
+        this.application.listRanking(parseRankingQuery(request.query)),
     );
   }
 }

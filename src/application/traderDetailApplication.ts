@@ -1,15 +1,15 @@
-import type { TraderRiskSummary } from '../domain/ranking/traderRiskSummary';
-import type { ITraderMetricsRepository } from '../domain/interface/iTraderMetricsRepository';
+import type { TraderRiskDto } from '../domain/dto/traderRiskDto';
+import type { TraderDetailService } from '../domain/service/traderDetailService';
 
-/** 用例：查詢單一交易員的風險詳情（US-02）。不存在時回傳 null（由 controller 映射為 404）。 */
+/** 用例（US-02）：委派 TraderDetailService 取得交易員詳情 DTO（不存在回傳 null）。 */
 export class TraderDetailApplication {
-  private readonly repository: ITraderMetricsRepository;
+  private readonly traderDetailService: TraderDetailService;
 
-  constructor(repository: ITraderMetricsRepository) {
-    this.repository = repository;
+  constructor(traderDetailService: TraderDetailService) {
+    this.traderDetailService = traderDetailService;
   }
 
-  async getTraderDetail(traderAddress: string): Promise<TraderRiskSummary | null> {
-    return this.repository.findSummaryByAddress(traderAddress);
+  getTraderDetail(traderAddress: string): Promise<TraderRiskDto | null> {
+    return this.traderDetailService.getTraderDetail(traderAddress);
   }
 }

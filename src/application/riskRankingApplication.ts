@@ -1,18 +1,16 @@
-import { rankTradersByRiskScore } from '../domain/ranking/rankByRiskScore';
-import type { RiskRankingQuery } from '../domain/ranking/rankByRiskScore';
-import type { TraderRiskSummary } from '../domain/ranking/traderRiskSummary';
-import type { ITraderMetricsRepository } from '../domain/interface/iTraderMetricsRepository';
+import type { TraderRiskDto } from '../domain/dto/traderRiskDto';
+import type { RiskRankingService } from '../domain/service/riskRankingService';
+import type { RiskRankingQuery } from '../domain/vo/riskRankingQuery';
 
-/** 用例：查詢風險導向排行（US-01）。編排 repository 讀取與 domain 排序邏輯。 */
+/** 用例（US-01）：委派 RiskRankingService 取得風險排行 DTO。 */
 export class RiskRankingApplication {
-  private readonly repository: ITraderMetricsRepository;
+  private readonly riskRankingService: RiskRankingService;
 
-  constructor(repository: ITraderMetricsRepository) {
-    this.repository = repository;
+  constructor(riskRankingService: RiskRankingService) {
+    this.riskRankingService = riskRankingService;
   }
 
-  async listRanking(query: RiskRankingQuery): Promise<TraderRiskSummary[]> {
-    const summaries = await this.repository.findRankableSummaries();
-    return rankTradersByRiskScore(summaries, query);
+  listRanking(query: RiskRankingQuery): Promise<TraderRiskDto[]> {
+    return this.riskRankingService.listRanking(query);
   }
 }

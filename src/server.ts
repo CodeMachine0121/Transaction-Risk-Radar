@@ -1,29 +1,33 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { ITraderMetricsRepository } from './domain/interface/iTraderMetricsRepository';
 import { RiskRankingApplication } from './application/riskRankingApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { RiskRankingController } from './controller/riskRankingController';
 import { TraderDetailController } from './controller/traderDetailController';
+import type { ITraderMetricsRepository } from './domain/interface/iTraderMetricsRepository';
+import { RiskRankingService } from './domain/service/riskRankingService';
+import { TraderDetailService } from './domain/service/traderDetailService';
 
 export type BuildServerOptions = {
   logger?: boolean;
 };
 
 /**
- * 組裝 HTTP server：注入 repository → applications → controllers。
- * repository 為介面，由呼叫端（組裝根或測試）決定具體實作（DIP）。
+ * 組裝 HTTP server：repository（介面）→ domain service（具體）→ application → controller。
+ * service 無介面、以具體實例注入 application（見 CLAUDE.md 測試策略）。
  */
 export function buildServer(
-  repository: ITraderMetricsRepository,
+  traderMetricsRepository: ITraderMetricsRepository,
   options: BuildServerOptions = {},
 ): FastifyInstance {
   const server = Fastify({ logger: options.logger ?? false });
 
   server.get('/health', () => ({ status: 'ok' }));
 
-  const riskRankingController = new RiskRankingController(new RiskRankingApplication(repository));
+  const riskRankingController = new RiskRankingController(
+    new RiskRankingApplication(new RiskRankingService(traderMetricsRepository)),
+  );
   const traderDetailController = new TraderDetailController(
-    new TraderDetailApplication(repository),
+    new TraderDetailApplication(new TraderDetailService(traderMetricsRepository)),
   );
   riskRankingController.register(server);
   traderDetailController.register(server);
