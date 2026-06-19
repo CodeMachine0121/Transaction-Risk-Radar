@@ -1,11 +1,13 @@
 import Decimal from 'decimal.js';
-import type { IHyperliquidProxy, IOpenPosition } from './ports/iHyperliquidProxy';
-import type { IPositionRepository, IPositionSnapshotRecord } from './ports/iPositionRepository';
+import type { IHyperliquidProxy } from '../domain/interface/iHyperliquidProxy';
+import type { OpenPosition } from '../domain/market/openPosition';
+import type { IPositionRepository } from '../domain/interface/iPositionRepository';
+import type { PositionSnapshotRecord } from '../domain/market/positionSnapshotRecord';
 
 const ZERO = new Decimal(0);
 const HUNDRED = new Decimal(100);
 
-const toSnapshotRecord = (position: IOpenPosition): IPositionSnapshotRecord => {
+const toSnapshotRecord = (position: OpenPosition): PositionSnapshotRecord => {
   const absoluteSize = position.signedSize.abs();
   const entryNotional = position.entryPrice.times(absoluteSize);
   return {

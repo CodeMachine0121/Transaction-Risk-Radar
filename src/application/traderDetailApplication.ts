@@ -1,5 +1,5 @@
 import type { TraderRiskSummary } from '../domain/ranking/traderRiskSummary';
-import type { ITraderMetricsRepository } from './ports/iTraderMetricsRepository';
+import type { ITraderMetricsRepository } from '../domain/interface/iTraderMetricsRepository';
 
 /** 用例：查詢單一交易員的風險詳情（US-02）。不存在時回傳 null（由 controller 映射為 404）。 */
 export class TraderDetailApplication {

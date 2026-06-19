@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient, TraderMetrics } from '@prisma/client';
-import type { ITraderMetricsRepository } from '../../application/ports/iTraderMetricsRepository';
+import type { ITraderMetricsRepository } from '../../domain/interface/iTraderMetricsRepository';
 import type { TraderRiskSummary } from '../../domain/ranking/traderRiskSummary';
 
 const toDomainDecimal = (value: { toString(): string } | null): Decimal | null =>

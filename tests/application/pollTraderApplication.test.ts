@@ -1,19 +1,17 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
-import type {
-  IPositionRepository,
-  IPositionSnapshotRecord,
-} from '@/application/ports/iPositionRepository';
-import type { ITraderFill } from '@/application/ports/iHyperliquidProxy';
+import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
+import type { PositionSnapshotRecord } from '@/domain/market/positionSnapshotRecord';
+import type { TraderFill } from '@/domain/market/traderFill';
 import { PollTraderApplication } from '@/application/pollTraderApplication';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 
 const createMockPositionRepository = (): IPositionRepository => ({
   saveFills: vi
-    .fn<(traderAddress: string, fills: ITraderFill[]) => Promise<void>>()
+    .fn<(traderAddress: string, fills: TraderFill[]) => Promise<void>>()
     .mockResolvedValue(undefined),
   saveSnapshots: vi
-    .fn<(traderAddress: string, snapshots: IPositionSnapshotRecord[]) => Promise<void>>()
+    .fn<(traderAddress: string, snapshots: PositionSnapshotRecord[]) => Promise<void>>()
     .mockResolvedValue(undefined),
 });
 
@@ -27,7 +25,7 @@ const openPosition = () => ({
   marginUsed: new Decimal(20),
 });
 
-const fill = (): ITraderFill => ({
+const fill = (): TraderFill => ({
   coin: 'ETH',
   price: new Decimal(100),
   size: new Decimal(1),

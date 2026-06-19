@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeRiskScore,
   DEFAULT_RISK_SCORE_WEIGHTS,
-  type IRiskScoreComponents,
+  type RiskScoreComponents,
 } from '@/domain/metrics/riskScore';
 
 const components = (values: {
@@ -12,7 +12,7 @@ const components = (values: {
   trap: number;
   downside: number;
   leverage: number;
-}): IRiskScoreComponents => ({
+}): RiskScoreComponents => ({
   normalizedMaxAdverseExcursion: new Decimal(values.mae),
   averagingDownRatio: new Decimal(values.averagingDown),
   trapSignal: new Decimal(values.trap),

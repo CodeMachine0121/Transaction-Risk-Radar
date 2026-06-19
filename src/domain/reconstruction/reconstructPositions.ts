@@ -1,32 +1,32 @@
 import Decimal from 'decimal.js';
-import type { ITraderFill } from '../../application/ports/iHyperliquidProxy';
-import type { IPositionLifecycleEvent, PositionSide } from '../metrics/averagingDown';
+import type { TraderFill } from '../market/traderFill';
+import type { PositionLifecycleEvent, PositionSide } from '../metrics/averagingDown';
 
-export interface IReconstructedPosition {
+export type ReconstructedPosition = {
   coin: string;
   side: PositionSide;
-  events: IPositionLifecycleEvent[];
+  events: PositionLifecycleEvent[];
   realizedProfitAndLoss: Decimal;
   realizedReturnPercentage: Decimal;
   isClosed: boolean;
-}
+};
 
 const ZERO = new Decimal(0);
 const HUNDRED = new Decimal(100);
 
-interface IPositionAccumulator {
+type PositionAccumulator = {
   coin: string;
   side: PositionSide;
-  events: IPositionLifecycleEvent[];
+  events: PositionLifecycleEvent[];
   /** 進場總成本 Σ(open/add 的 price × size)，作為 ROI 報酬率的分母。 */
   entryCost: Decimal;
   realizedProfitAndLoss: Decimal;
-}
+};
 
 const sameSign = (left: Decimal, right: Decimal): boolean =>
   (left.isPositive() && right.isPositive()) || (left.isNegative() && right.isNegative());
 
-const openPosition = (coin: string, signedSize: Decimal): IPositionAccumulator => ({
+const openPosition = (coin: string, signedSize: Decimal): PositionAccumulator => ({
   coin,
   side: signedSize.isPositive() ? 'long' : 'short',
   events: [],
@@ -35,7 +35,7 @@ const openPosition = (coin: string, signedSize: Decimal): IPositionAccumulator =
 });
 
 const addEntryEvent = (
-  accumulator: IPositionAccumulator,
+  accumulator: PositionAccumulator,
   type: 'open' | 'add',
   price: Decimal,
   size: Decimal,
@@ -44,7 +44,7 @@ const addEntryEvent = (
   accumulator.entryCost = accumulator.entryCost.plus(price.times(size));
 };
 
-const finalize = (accumulator: IPositionAccumulator, isClosed: boolean): IReconstructedPosition => ({
+const finalize = (accumulator: PositionAccumulator, isClosed: boolean): ReconstructedPosition => ({
   coin: accumulator.coin,
   side: accumulator.side,
   events: accumulator.events,
@@ -55,10 +55,10 @@ const finalize = (accumulator: IPositionAccumulator, isClosed: boolean): IRecons
   isClosed,
 });
 
-const reconstructCoin = (coin: string, coinFills: ITraderFill[]): IReconstructedPosition[] => {
+const reconstructCoin = (coin: string, coinFills: TraderFill[]): ReconstructedPosition[] => {
   const ordered = [...coinFills].sort((left, right) => left.timestamp - right.timestamp);
-  const positions: IReconstructedPosition[] = [];
-  let current: IPositionAccumulator | null = null;
+  const positions: ReconstructedPosition[] = [];
+  let current: PositionAccumulator | null = null;
   let running = ZERO;
 
   for (const fill of ordered) {
@@ -108,15 +108,15 @@ const reconstructCoin = (coin: string, coinFills: ITraderFill[]): IReconstructed
  * 持倉歸零即為一個已閉倉位，反向穿越視為「平舊倉＋開新倉」。
  * 報酬率採 ROI 法（realizedProfitAndLoss / 進場總成本 × 100）。
  */
-export function reconstructPositions(fills: ITraderFill[]): IReconstructedPosition[] {
-  const fillsByCoin = new Map<string, ITraderFill[]>();
+export function reconstructPositions(fills: TraderFill[]): ReconstructedPosition[] {
+  const fillsByCoin = new Map<string, TraderFill[]>();
   for (const fill of fills) {
     const existing = fillsByCoin.get(fill.coin) ?? [];
     existing.push(fill);
     fillsByCoin.set(fill.coin, existing);
   }
 
-  const positions: IReconstructedPosition[] = [];
+  const positions: ReconstructedPosition[] = [];
   for (const [coin, coinFills] of fillsByCoin) {
     positions.push(...reconstructCoin(coin, coinFills));
   }

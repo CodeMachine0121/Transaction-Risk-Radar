@@ -17,22 +17,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-| 層面 | 選型 | 角色 / 備註 |
-| :--- | :--- | :--- |
-| 語言 | **TypeScript** | 全專案；禁用 `any` / `unknown`（見 Conventions）|
-| 執行環境 | **Node.js** | |
-| Web 框架 | **Fastify** | REST API（Controller 層）。比 Express 快、TS 支援好；不選 NestJS（對 solo 過重）|
-| ORM | **Prisma 7** | 資料存取；`schema.prisma` 為 code-first 單一來源（v7：不含 `url`）。連線 URL 在 `prisma.config.ts`（供 CLI/Migrate）；執行時用 **`@prisma/adapter-pg`**（`pg` driver adapter）連線，工廠在 `src/infrastructure/persistence/prismaClient.ts`。透過型別安全 client 存取、禁手寫 SQL；金額欄用 `Decimal`，不用浮點 |
-| 資料庫 | **PostgreSQL + TimescaleDB** | 時序資料（`position_events`、`position_snapshots`）；Timescale 擴充加速時間窗查詢 |
-| 快取 / 佇列 | **Redis** | BullMQ 後端、即時狀態快取 |
-| 背景作業 | **BullMQ** | leaderboard 同步、分層輪詢、分析引擎排程 |
-| 鏈上互動 | **viem**（後續接 EVM 協議時） | TS-first；第一版打 Hyperliquid 官方 API 可能用不到 |
-| 數值處理 | **bigint + decimal.js / dnum** | 金額/鏈上數值；**禁用 JS float** |
-| 測試 | **Vitest（建議）** | 單元測試驅動指標計算引擎（TDD）|
-| 程式碼品質 | **ESLint** + **Prettier** + **Husky** | pre-commit 強制 lint + type check |
-| 部署 | **單一 VPS + Docker Compose** | 不用 K8s / 微服務 |
-| 資料來源 | **Hyperliquid 官方 REST API** | 第一版唯一來源（leaderboard、clearinghouseState 等）|
-| 對外交付 | **REST（pull）** | 第一版；SSE 即時推送列為後續階段 |
+| 層面        | 選型                                  | 角色 / 備註                                                                                                                                                                                                                                                                                                     |
+| :---------- | :------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 語言        | **TypeScript**                        | 全專案；禁用 `any` / `unknown`（見 Conventions）                                                                                                                                                                                                                                                                |
+| 執行環境    | **Node.js**                           |                                                                                                                                                                                                                                                                                                                 |
+| Web 框架    | **Fastify**                           | REST API（Controller 層）。比 Express 快、TS 支援好；不選 NestJS（對 solo 過重）                                                                                                                                                                                                                                |
+| ORM         | **Prisma 7**                          | 資料存取；`schema.prisma` 為 code-first 單一來源（v7：不含 `url`）。連線 URL 在 `prisma.config.ts`（供 CLI/Migrate）；執行時用 **`@prisma/adapter-pg`**（`pg` driver adapter）連線，工廠在 `src/infrastructure/persistence/prismaClient.ts`。透過型別安全 client 存取、禁手寫 SQL；金額欄用 `Decimal`，不用浮點 |
+| 資料庫      | **PostgreSQL + TimescaleDB**          | 時序資料（`position_events`、`position_snapshots`）；Timescale 擴充加速時間窗查詢                                                                                                                                                                                                                               |
+| 快取 / 佇列 | **Redis**                             | BullMQ 後端、即時狀態快取                                                                                                                                                                                                                                                                                       |
+| 背景作業    | **BullMQ**                            | leaderboard 同步、分層輪詢、分析引擎排程                                                                                                                                                                                                                                                                        |
+| 鏈上互動    | **viem**（後續接 EVM 協議時）         | TS-first；第一版打 Hyperliquid 官方 API 可能用不到                                                                                                                                                                                                                                                              |
+| 數值處理    | **bigint + decimal.js / dnum**        | 金額/鏈上數值；**禁用 JS float**                                                                                                                                                                                                                                                                                |
+| 測試        | **Vitest（建議）**                    | 單元測試驅動指標計算引擎（TDD）                                                                                                                                                                                                                                                                                 |
+| 程式碼品質  | **ESLint** + **Prettier** + **Husky** | pre-commit 強制 lint + type check                                                                                                                                                                                                                                                                               |
+| 部署        | **單一 VPS + Docker Compose**         | 不用 K8s / 微服務                                                                                                                                                                                                                                                                                               |
+| 資料來源    | **Hyperliquid 官方 REST API**         | 第一版唯一來源（leaderboard、clearinghouseState 等）                                                                                                                                                                                                                                                            |
+| 對外交付    | **REST（pull）**                      | 第一版；SSE 即時推送列為後續階段                                                                                                                                                                                                                                                                                |
 
 ## Architecture — Clean / Onion Architecture
 
@@ -42,17 +42,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    Controller ───▶ Application ───▶ Domain ◀─── Infrastructure
    (HTTP/Fastify)   (use cases)     (核心)        (Repository/Client/Proxy 實作)
                                       ▲
-                         src/domain/interface/ 定義所有對外契約 (ports)
+                         src/domain/interface/ 放所有對外介面（一介面一檔）
 ```
 
-- **Domain（核心）**：實體、value object、領域邏輯（指標計算引擎，純函式、可 TDD），以及**所有對外契約（ports）**——契約集中在 `src/domain/interface/`。**Domain 不 import 任何其他層**（不認識 HTTP、Hyperliquid、Prisma…）。
-- **Application** 依賴 Domain：編排用例，透過 domain 的 port 取用 repository/proxy/client。
+- **Domain（核心）**：實體、value object、領域邏輯（指標計算引擎，純函式、可 TDD），以及**所有對外介面**——集中在 `src/domain/interface/`（一個介面一個檔案）。**Domain 不 import 任何其他層**（不認識 HTTP、Hyperliquid、Prisma…）。
+- **Application** 依賴 Domain：編排用例，透過 domain 的介面取用 repository/proxy/client。
 - **Controller** 依賴 Application（與 domain 型別）：只負責 HTTP 請求/回應轉換。
-- **Infrastructure**（Repository / Client / Proxy 的**實作**）依賴 Domain：實作 `domain/interface/` 的 port（DIP——細節依賴抽象，抽象不依賴細節）。
+- **Infrastructure**（Repository / Client / Proxy 的**實作**）依賴 Domain：實作 `domain/interface/` 的介面（DIP——細節依賴抽象，抽象不依賴細節）。
 - 具體實作在組裝根（composition root：`main.ts` / `server.ts`）注入。
 - 指標計算引擎為純函式、不碰 I/O。背景流程（與查詢解耦）：`SyncLeaderboard` → `PollTrader`（BullMQ 排程）→ `RecomputeTraderMetrics`；查詢端只讀算好的 `trader_metrics`。
 
-> 註：程式碼正逐步對齊此規範（介面集中至 `domain/interface/`、資料形狀改 `type`）。
+> **不使用「port」一詞或資料夾**——對外介面一律稱「介面」，集中在 `src/domain/interface/`。
 
 ## Engineering Conventions（強制）
 
@@ -68,6 +68,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   | Proxy | `Proxy` | infrastructure |
 
   純 domain 計算函式（如 `src/domain/metrics/` 的 `compute*`）維持函式命名；當把編排邏輯包成 domain service 物件時才加 `Service` 後綴。
+
 - **資料物件命名**：
   | 類別 | 規則 |
   | :--- | :--- |
@@ -76,14 +77,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   | Entity（我們的 domain 物件）| 以領域語彙命名（不加 `Dto`/`Request`）|
 
   這些資料物件一律是 **`type`**（見下），回應直接回傳、不另立 `Response` 型別。例：`TraderRiskDto`（回應）、`RiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity）。
-- **`interface` 只用於「行為契約 / port」**（會被 class 實作或被注入的相依）：如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`IPositionRepository`。一律 `I` 前綴，**集中放在 `src/domain/interface/`**。**實例檔（class / 函式模組）內不得宣告任何 `interface`。**
+
+- **`interface` 只用於「行為契約」**（會被 class 實作或被注入的相依）：如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`IPositionRepository`。一律 `I` 前綴，**集中放在 `src/domain/interface/`，一個介面一個檔案（鐵則）**。**實例檔（class / 函式模組）內不得宣告任何 `interface`。不使用「port」一詞或資料夾。**
 - **資料形狀一律用 `type`，不用 `interface`、不加 `I`**：entity / value object / DTO / Request（如 `ReconstructedPosition`、`TraderRiskSummary`、`TraderRiskDto`、`RiskRankingRequest`）。
 - **固定資料形狀優先以泛型帶入契約**，而非為其定義具名資料介面：如 `IRepository<TEntity>`、`IResponse<TData>`。
 - **Presentation DTO 屬 delivery 細節**：放在 controller 旁（`type`），domain 不認識。
 - **外部 wire / vendor 形狀屬 infrastructure**：放在邊際層（`type`）；若外部 library 自帶型別，**只有邊際層依賴它**，domain 永不接觸。
 - **具體實作用「純角色名」**：實作不帶 `I`、**也不帶技術前綴**（class 名與檔名都是）。例：`ITraderMetricsRepository` 的實作是 `TraderMetricsRepository`（**不是** `PrismaTraderMetricsRepository`）；`IHyperliquidProxy` 的實作是 `HyperliquidProxy`（**不是** `HyperliquidHttpProxy`）。
 - **檔名必須對齊其主要型別/符號**（嚴格）：
-  - 介面（port）檔 → `i` 前綴 camelCase，如 `iTraderMetricsRepository.ts`、`iHyperliquidProxy.ts`。
+  - 介面檔（在 `domain/interface/`）→ `i` 前綴 camelCase、一檔一介面，如 `iTraderMetricsRepository.ts`、`iHyperliquidProxy.ts`。
   - 實作檔 → 純角色名 camelCase，如 `traderMetricsRepository.ts`、`hyperliquidProxy.ts`。
   - 以函式為主的模組檔 → 跟著主要函式命名（如 `reconstructPositions.ts`、`assembleTraderPositionInputs.ts`）。
 - **TypeScript 禁用 `any` 與 `unknown`。** 一律給出明確型別。
@@ -119,6 +121,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Layout
 
 `src/` 依分層架構組織，各層職責見其 `README.md`：
-`src/controller/`（Fastify 路由）· `src/application/`（用例編排）· `src/domain/`（指標計算引擎，純邏輯）· `src/infrastructure/`（Prisma repository + Hyperliquid proxy）· `src/shared/`（跨層工具）· `src/main.ts`（組裝根 / server bootstrap）。
+
+- `src/domain/`（核心）：`interface/`（對外介面，一檔一介面）· `market/`（市場資料 value object：`traderFill`、`openPosition`、`leaderboardTrader`、`positionSnapshotRecord`）· `metrics/`（指標引擎）· `reconstruction/` · `assembly/` · `ranking/`
+- `src/application/`（用例編排，依賴 domain 介面；**無 ports 資料夾**）
+- `src/controller/`（Fastify 路由 + DTO/Request `type`）
+- `src/infrastructure/`：`persistence/`（Prisma repository）· `hyperliquid/`（proxy + `hyperliquidWire` 原始型別）
+- `src/shared/`（跨層工具）· `src/main.ts` / `src/server.ts`（組裝根）
 
 **測試集中在 `tests/`**（不與原始碼並列），目錄結構鏡像 `src/`。測試一律用 **`@/` path alias** 匯入待測模組（`@/` → `src/`），例如 `import { normalize } from '@/domain/metrics/normalize'`；原始碼內部彼此仍用相對匯入。alias 同時設定於 `tsconfig.json`（`paths`）與 `vitest.config.ts`（`resolve.alias`）。

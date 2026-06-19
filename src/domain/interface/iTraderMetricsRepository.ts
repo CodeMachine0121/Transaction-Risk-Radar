@@ -1,9 +1,6 @@
-import type { TraderRiskSummary } from '../../domain/ranking/traderRiskSummary';
+import type { TraderRiskSummary } from '../ranking/traderRiskSummary';
 
-/**
- * Repository port（由 infrastructure 實作，application 只依賴此介面 → DIP）。
- * 提供已計算好的交易員風險指標摘要的讀取。
- */
+/** 讀取已計算好的交易員風險指標摘要。 */
 export interface ITraderMetricsRepository {
   /** 取得所有可排行（已有 riskScore、非 insufficientData）的交易員摘要。 */
   findRankableSummaries(): Promise<TraderRiskSummary[]>;

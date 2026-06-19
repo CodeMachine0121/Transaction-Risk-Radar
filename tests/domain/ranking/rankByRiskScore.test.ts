@@ -39,10 +39,10 @@ describe('rankTradersByRiskScore', () => {
   });
 
   it('applies offset and limit pagination', () => {
-    const ranked = rankTradersByRiskScore(
-      [summary('A', 70), summary('B', 30), summary('C', 50)],
-      { offset: 1, limit: 1 },
-    );
+    const ranked = rankTradersByRiskScore([summary('A', 70), summary('B', 30), summary('C', 50)], {
+      offset: 1,
+      limit: 1,
+    });
     expect(addresses(ranked)).toEqual(['C']);
   });
 });

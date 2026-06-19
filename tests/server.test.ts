@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '@/server';
-import type { ITraderRiskDto } from '@/controller/traderRiskDto';
+import type { TraderRiskDto } from '@/controller/traderRiskDto';
 import {
   buildSummary,
   createMockTraderMetricsRepository,
@@ -28,7 +28,7 @@ describe('HTTP API', () => {
     const response = await server.inject({ method: 'GET', url: '/rankings' });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json<ITraderRiskDto[]>();
+    const body = response.json<TraderRiskDto[]>();
     expect(body.map((trader) => trader.traderAddress)).toEqual(['B', 'A']);
     expect(body[0]?.riskScore).toBe('30');
   });
@@ -43,7 +43,7 @@ describe('HTTP API', () => {
 
     const response = await server.inject({ method: 'GET', url: '/rankings?direction=descending' });
 
-    const body = response.json<ITraderRiskDto[]>();
+    const body = response.json<TraderRiskDto[]>();
     expect(body.map((trader) => trader.traderAddress)).toEqual(['A', 'B']);
   });
 
@@ -55,7 +55,7 @@ describe('HTTP API', () => {
     const response = await server.inject({ method: 'GET', url: '/traders/A' });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json<ITraderRiskDto>().traderAddress).toBe('A');
+    expect(response.json<TraderRiskDto>().traderAddress).toBe('A');
   });
 
   it('GET /traders/:address returns 404 when the trader is unknown', async () => {

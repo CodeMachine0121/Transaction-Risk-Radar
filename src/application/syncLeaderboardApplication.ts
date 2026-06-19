@@ -1,10 +1,10 @@
-import type { IHyperliquidProxy } from './ports/iHyperliquidProxy';
-import type { ITraderRepository } from './ports/iTraderRepository';
+import type { IHyperliquidProxy } from '../domain/interface/iHyperliquidProxy';
+import type { ITraderRepository } from '../domain/interface/iTraderRepository';
 
-export interface ISyncLeaderboardOptions {
+export type SyncLeaderboardOptions = {
   /** 同步的交易員數量上限（取 leaderboard 前 N 名）；未設定則全部同步。 */
   maximumTraders?: number;
-}
+};
 
 /** 用例（US-03）：從 Hyperliquid leaderboard 同步追蹤名單。回傳同步的交易員數。 */
 export class SyncLeaderboardApplication {
@@ -15,7 +15,7 @@ export class SyncLeaderboardApplication {
   constructor(
     proxy: IHyperliquidProxy,
     traderRepository: ITraderRepository,
-    options: ISyncLeaderboardOptions = {},
+    options: SyncLeaderboardOptions = {},
   ) {
     this.proxy = proxy;
     this.traderRepository = traderRepository;

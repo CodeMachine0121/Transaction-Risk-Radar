@@ -1,9 +1,9 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import type { ITraderFill } from '@/application/ports/iHyperliquidProxy';
+import type { TraderFill } from '@/domain/market/traderFill';
 import { reconstructPositions } from '@/domain/reconstruction/reconstructPositions';
 
-interface IFillSpec {
+type FillSpec = {
   side: 'buy' | 'sell';
   price: number;
   size: number;
@@ -11,9 +11,9 @@ interface IFillSpec {
   time: number;
   closedPnl?: number;
   coin?: string;
-}
+};
 
-const fill = (spec: IFillSpec): ITraderFill => ({
+const fill = (spec: FillSpec): TraderFill => ({
   coin: spec.coin ?? 'ETH',
   price: new Decimal(spec.price),
   size: new Decimal(spec.size),
@@ -90,7 +90,15 @@ describe('reconstructPositions', () => {
   it('separates positions by coin', () => {
     const positions = reconstructPositions([
       fill({ coin: 'ETH', side: 'buy', price: 100, size: 1, startPosition: 0, time: 1 }),
-      fill({ coin: 'ETH', side: 'sell', price: 110, size: 1, startPosition: 1, time: 2, closedPnl: 10 }),
+      fill({
+        coin: 'ETH',
+        side: 'sell',
+        price: 110,
+        size: 1,
+        startPosition: 1,
+        time: 2,
+        closedPnl: 10,
+      }),
       fill({ coin: 'BTC', side: 'buy', price: 2000, size: 1, startPosition: 0, time: 3 }),
     ]);
 

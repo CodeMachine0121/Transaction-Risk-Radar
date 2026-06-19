@@ -27,7 +27,9 @@ describe('HyperliquidProxy', () => {
 
     const traders = await buildProxy(fetchMock).fetchLeaderboard();
 
-    expect(fetchMock).toHaveBeenCalledWith('https://stats-data.hyperliquid.xyz/Mainnet/leaderboard');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://stats-data.hyperliquid.xyz/Mainnet/leaderboard',
+    );
     expect(traders).toHaveLength(2);
     expect(traders[0]?.address).toBe('0x1');
     expect(traders[0]?.accountValue.toString()).toBe('1000.5');

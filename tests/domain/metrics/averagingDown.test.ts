@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   computeAveragingDownRatio,
   detectAveragingDown,
-  type IPositionLifecycleEvent,
+  type PositionLifecycleEvent,
 } from '@/domain/metrics/averagingDown';
 
 const event = (
-  type: IPositionLifecycleEvent['type'],
+  type: PositionLifecycleEvent['type'],
   price: number,
   size: number,
-): IPositionLifecycleEvent => ({ type, price: new Decimal(price), size: new Decimal(size) });
+): PositionLifecycleEvent => ({ type, price: new Decimal(price), size: new Decimal(size) });
 
 describe('detectAveragingDown', () => {
   it('flags a long that adds at a price below its average entry (adding into a loss)', () => {

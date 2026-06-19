@@ -35,13 +35,13 @@
 
 ## 3. User Stories & Acceptance Criteria
 
-| ID | User Story | Acceptance Criteria | Priority |
-| :--- | :--- | :--- | :--- |
-| **US-01** | **As a** 散戶, **I want** 取得一份依風險排序的交易員清單, **so that** 我能優先看到相對安全、可跟的交易員。 | 1. `GET /rankings` 回傳依 `riskScore` 排序的交易員列表<br>2. 預設由低到高（安全在前），可參數切換為由高到低<br>3. 支援分頁<br>4. 已平倉位數 < `minimumClosedPositions` 者標記 `insufficientData`，不給 `riskScore` | P0 |
-| **US-02** | **As a** 散戶, **I want** 查看單一交易員的完整風險指標, **so that** 我能判斷他是不是攤平/陷阱型、要準備多少緩衝。 | 1. `GET /traders/:address` 回傳 `maxAdverseExcursionPercentile90`、`averagingDownRatio`、`winRate`、`returnDownsideDeviation`、`averageLeverage`、`trapSignal`、`riskScore`<br>2. 明確標示 `isAveragingDown` 行為<br>3. 找不到地址回傳 404 | P0 |
-| **US-03** | **As a** 系統, **I want** 自動從 Hyperliquid leaderboard 同步交易員清單, **so that** 不需人工維護追蹤名單。 | 1. 背景作業定時拉取 leaderboard<br>2. 處理分頁與限流<br>3. 以地址去重後寫入 `traders` | P0 |
-| **US-04** | **As a** 系統, **I want** 定時輪詢並記錄每位交易員的倉位動作與浮虧快照, **so that** 分析引擎有足夠資料計算指標。 | 1. 分層輪詢（高排名勤、長尾鬆）<br>2. 寫入 `position_events` 與 `position_snapshots`<br>3. 以成交唯一 id 去重，重複輪詢不重複計算 | P0 |
-| **US-05** | **As a** 系統, **I want** 定期重算所有交易員指標與 `riskScore`, **so that** 排行保持更新。 | 1. 分析引擎排程執行<br>2. 依第 4 章公式計算並寫回 `trader_metrics`<br>3. 計算僅採用近 90 天已平倉位 | P0 |
+| ID        | User Story                                                                                                        | Acceptance Criteria                                                                                                                                                                                                                        | Priority |
+| :-------- | :---------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- |
+| **US-01** | **As a** 散戶, **I want** 取得一份依風險排序的交易員清單, **so that** 我能優先看到相對安全、可跟的交易員。        | 1. `GET /rankings` 回傳依 `riskScore` 排序的交易員列表<br>2. 預設由低到高（安全在前），可參數切換為由高到低<br>3. 支援分頁<br>4. 已平倉位數 < `minimumClosedPositions` 者標記 `insufficientData`，不給 `riskScore`                         | P0       |
+| **US-02** | **As a** 散戶, **I want** 查看單一交易員的完整風險指標, **so that** 我能判斷他是不是攤平/陷阱型、要準備多少緩衝。 | 1. `GET /traders/:address` 回傳 `maxAdverseExcursionPercentile90`、`averagingDownRatio`、`winRate`、`returnDownsideDeviation`、`averageLeverage`、`trapSignal`、`riskScore`<br>2. 明確標示 `isAveragingDown` 行為<br>3. 找不到地址回傳 404 | P0       |
+| **US-03** | **As a** 系統, **I want** 自動從 Hyperliquid leaderboard 同步交易員清單, **so that** 不需人工維護追蹤名單。       | 1. 背景作業定時拉取 leaderboard<br>2. 處理分頁與限流<br>3. 以地址去重後寫入 `traders`                                                                                                                                                      | P0       |
+| **US-04** | **As a** 系統, **I want** 定時輪詢並記錄每位交易員的倉位動作與浮虧快照, **so that** 分析引擎有足夠資料計算指標。  | 1. 分層輪詢（高排名勤、長尾鬆）<br>2. 寫入 `position_events` 與 `position_snapshots`<br>3. 以成交唯一 id 去重，重複輪詢不重複計算                                                                                                          | P0       |
+| **US-05** | **As a** 系統, **I want** 定期重算所有交易員指標與 `riskScore`, **so that** 排行保持更新。                        | 1. 分析引擎排程執行<br>2. 依第 4 章公式計算並寫回 `trader_metrics`<br>3. 計算僅採用近 90 天已平倉位                                                                                                                                        | P0       |
 
 ---
 
@@ -72,12 +72,14 @@ synchronizeLeaderboard ──▶ traders
 **時間窗：** 盈虧、勝率、下行標準差皆採用**近 90 天**已平倉位。
 
 1. **最大逆向幅度（MAE）**
+
    ```
    maxAdverseExcursionPerPosition   = min(unrealizedProfitAndLossPercentage)  // 單倉位，負值
    maxAdverseExcursionPercentile90  = percentile90( |maxAdverseExcursionPerPosition| )  // 交易員層級
    ```
 
 2. **攤平偵測**
+
    ```
    isAveragingDown(position) = position 在 unrealizedProfitAndLossPercentage < 0 時
                                存在 size 遞增的 add 事件
@@ -85,6 +87,7 @@ synchronizeLeaderboard ──▶ traders
    ```
 
 3. **盈虧與勝率（近 90 天）**
+
    ```
    realizedReturnPercentagePerPosition = 單一已平倉位的已實現報酬率（ROI 法）
                                        = realizedProfitAndLoss / 進場總成本 × 100
@@ -95,20 +98,25 @@ synchronizeLeaderboard ──▶ traders
    ```
 
 4. **下行標準差（近 90 天）**
+
    ```
    returnDownsideDeviation = standardDeviation(
        realizedReturnPercentagePerPosition 中所有 < 0 的值
    )
    ```
+
    衡量「賠的時候穩不穩、會不會突然爆一筆」；越高越危險。僅取負報酬，不懲罰上行波動。
 
 5. **陷阱訊號**
+
    ```
    trapSignal = winRate × normalize(maxAdverseExcursionPercentile90)
    ```
+
    抓「高勝率（看似穩）但倉位偷偷扛很深」的馬丁格爾陷阱。
 
 6. **正規化函式**
+
    ```
    normalize(maxAdverseExcursionPercentile90) = clamp(|maxAdverseExcursionPercentile90| / 50, 0, 1)
    normalize(averageLeverage)                 = clamp(averageLeverage / 20, 0, 1)
@@ -116,6 +124,7 @@ synchronizeLeaderboard ──▶ traders
    ```
 
 7. **風險分數（0–100，越高越危險）**
+
    ```
    riskScore = 100 × (
        weightMaxAdverseExcursion      × normalize(maxAdverseExcursionPercentile90)
@@ -125,15 +134,16 @@ synchronizeLeaderboard ──▶ traders
      + weightLeverage                 × normalize(averageLeverage)
    )
    ```
+
    **預設權重（皆可設定，總和 = 1）：**
 
-   | 識別字 | 值 |
-   | :--- | :--- |
-   | `weightMaxAdverseExcursion` | 0.30 |
-   | `weightAveragingDown` | 0.25 |
-   | `weightTrapSignal` | 0.15 |
+   | 識別字                          | 值   |
+   | :------------------------------ | :--- |
+   | `weightMaxAdverseExcursion`     | 0.30 |
+   | `weightAveragingDown`           | 0.25 |
+   | `weightTrapSignal`              | 0.15 |
    | `weightReturnDownsideDeviation` | 0.15 |
-   | `weightLeverage` | 0.15 |
+   | `weightLeverage`                | 0.15 |
 
    **設計原則：`riskScore` 衡量「跟單有多危險」，刻意不獎勵報酬率——把「報酬好看」與「適合跟單」徹底分開。**
 
@@ -145,13 +155,14 @@ synchronizeLeaderboard ──▶ traders
 
 指標所需資料來自**兩條 Hyperliquid 來源**，於 repository 層按「交易員 × 標的（coin）」join：
 
-| 資料 | 來源 | 產出 |
-| :--- | :--- | :--- |
-| 倉位生命週期 events（open/add/reduce/close）、已實現盈虧、報酬率 | `userFillsByTime`（成交） | `position_events` + 每倉位 `realizedProfitAndLoss` / `realizedReturnPercentage` |
-| 浮虧時間序列（算 MAE）、槓桿 | 定時 poll `clearinghouseState` | `position_snapshots`（每次輪詢一筆 `unrealizedProfitAndLossPercentage` + `leverage`）|
-| 追蹤名單 | `leaderboard`（GET）| `traders` |
+| 資料                                                             | 來源                           | 產出                                                                                  |
+| :--------------------------------------------------------------- | :----------------------------- | :------------------------------------------------------------------------------------ |
+| 倉位生命週期 events（open/add/reduce/close）、已實現盈虧、報酬率 | `userFillsByTime`（成交）      | `position_events` + 每倉位 `realizedProfitAndLoss` / `realizedReturnPercentage`       |
+| 浮虧時間序列（算 MAE）、槓桿                                     | 定時 poll `clearinghouseState` | `position_snapshots`（每次輪詢一筆 `unrealizedProfitAndLossPercentage` + `leverage`） |
+| 追蹤名單                                                         | `leaderboard`（GET）           | `traders`                                                                             |
 
 **倉位重建（`reconstructPositions`，純 domain 邏輯）：** 將某交易員的 fills 依標的分組、按時間排序，追蹤帶號持倉量，逐筆分類為 open/add/reduce/close；持倉量歸零即為一個已閉倉位、反向穿越（sign flip）視為「平舊倉＋開新倉」。每倉位的 `realizedProfitAndLoss = Σ closedPnl`、`realizedReturnPercentage` 以 ROI 法計（見規則 3）。
+
 - 去重鍵：fill 的 `tid`。
 - **槓桿**：來自 poll `clearinghouseState`、記於 `position_snapshots.leverage`（fills 不含槓桿）；`averageLeverage(position)` = 該倉位 snapshots 的槓桿平均。
 - **組裝**：`assembleTraderPositionInputs` 把「重建倉位 + 其 snapshots」併為 `computeTraderMetrics` 的輸入；**沒有任何 snapshot 的倉位（開倉與平倉落在同一輪詢間隔內、從未被觀測到開倉）會被排除**（無法算 MAE/槓桿）。

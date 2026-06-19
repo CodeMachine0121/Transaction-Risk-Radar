@@ -1,13 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { ITraderMetricsRepository } from './application/ports/iTraderMetricsRepository';
+import type { ITraderMetricsRepository } from './domain/interface/iTraderMetricsRepository';
 import { RiskRankingApplication } from './application/riskRankingApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { RiskRankingController } from './controller/riskRankingController';
 import { TraderDetailController } from './controller/traderDetailController';
 
-export interface IBuildServerOptions {
+export type BuildServerOptions = {
   logger?: boolean;
-}
+};
 
 /**
  * 組裝 HTTP server：注入 repository → applications → controllers。
@@ -15,14 +15,16 @@ export interface IBuildServerOptions {
  */
 export function buildServer(
   repository: ITraderMetricsRepository,
-  options: IBuildServerOptions = {},
+  options: BuildServerOptions = {},
 ): FastifyInstance {
   const server = Fastify({ logger: options.logger ?? false });
 
   server.get('/health', () => ({ status: 'ok' }));
 
   const riskRankingController = new RiskRankingController(new RiskRankingApplication(repository));
-  const traderDetailController = new TraderDetailController(new TraderDetailApplication(repository));
+  const traderDetailController = new TraderDetailController(
+    new TraderDetailApplication(repository),
+  );
   riskRankingController.register(server);
   traderDetailController.register(server);
 

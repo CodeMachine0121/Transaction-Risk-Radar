@@ -19,7 +19,9 @@ export function computeReturnDownsideDeviation(
   }
 
   const count = new Decimal(negativeReturns.length);
-  const mean = negativeReturns.reduce((total, current) => total.plus(current), ZERO).dividedBy(count);
+  const mean = negativeReturns
+    .reduce((total, current) => total.plus(current), ZERO)
+    .dividedBy(count);
   const sumSquaredDeviations = negativeReturns.reduce(
     (total, current) => total.plus(current.minus(mean).pow(2)),
     ZERO,

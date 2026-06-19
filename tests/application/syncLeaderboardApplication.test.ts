@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
-import type { ITraderRepository } from '@/application/ports/iTraderRepository';
+import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 import { SyncLeaderboardApplication } from '@/application/syncLeaderboardApplication';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 
