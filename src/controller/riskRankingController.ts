@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { RiskRankingApplication } from '../application/riskRankingApplication';
 import type { RiskRankingQuery } from '../domain/ranking/rankByRiskScore';
-import { toTraderRiskResponse, type TraderRiskResponse } from './traderRiskResponse';
+import { toTraderRiskDto, type TraderRiskDto } from './traderRiskDto';
 
-interface RiskRankingQuerystring {
+interface RiskRankingRequest {
   direction?: string;
   offset?: string;
   limit?: string;
@@ -17,7 +17,7 @@ const parseOptionalInteger = (raw: string | undefined): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const parseRankingQuery = (raw: RiskRankingQuerystring): RiskRankingQuery => {
+const parseRankingQuery = (raw: RiskRankingRequest): RiskRankingQuery => {
   const query: RiskRankingQuery = {};
   if (raw.direction === 'ascending' || raw.direction === 'descending') {
     query.direction = raw.direction;
@@ -42,11 +42,11 @@ export class RiskRankingController {
   }
 
   register(server: FastifyInstance): void {
-    server.get<{ Querystring: RiskRankingQuerystring }>(
+    server.get<{ Querystring: RiskRankingRequest }>(
       '/rankings',
-      async (request): Promise<TraderRiskResponse[]> => {
+      async (request): Promise<TraderRiskDto[]> => {
         const ranking = await this.application.listRanking(parseRankingQuery(request.query));
-        return ranking.map(toTraderRiskResponse);
+        return ranking.map(toTraderRiskDto);
       },
     );
   }

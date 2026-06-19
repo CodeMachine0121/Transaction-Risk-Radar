@@ -66,6 +66,14 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
   | Proxy | `Proxy` | infrastructure |
 
   純 domain 計算函式（如 `src/domain/metrics/` 的 `compute*`）維持函式命名；當把編排邏輯包成 domain service 物件時才加 `Service` 後綴。
+- **資料物件命名**：
+  | 類別 | 規則 |
+  | :--- | :--- |
+  | DTO（跨邊界傳輸的資料物件，含外部 API 原始形狀、HTTP 回應）| `Dto` 後綴 |
+  | Endpoint 接收的物件（querystring / params / body）| `Request` 後綴 |
+  | Entity（我們的 domain 物件）| 以領域語彙命名（不加 `Dto`/`Request`）|
+
+  回應直接以 `Dto` 回傳，不另立 `Response` 型別。例：`TraderRiskDto`（回應）、`RiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity）。
 - **TypeScript 禁用 `any` 與 `unknown`。** 一律給出明確型別。
 - **禁止「先宣告後賦值」。** 變數必須在宣告當下即賦值（不可先 `let x;` 之後再指派）。
 - **嚴禁 `private static` method。** 視為 code smell——應抽到對應物件成為其 instance method，透過實例呼叫。**單元測試除外。**

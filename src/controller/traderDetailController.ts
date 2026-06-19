@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { TraderDetailApplication } from '../application/traderDetailApplication';
-import { toTraderRiskResponse, type TraderRiskResponse } from './traderRiskResponse';
+import { toTraderRiskDto, type TraderRiskDto } from './traderRiskDto';
 
-interface TraderDetailParams {
+interface TraderDetailRequest {
   address: string;
 }
 
@@ -15,14 +15,14 @@ export class TraderDetailController {
   }
 
   register(server: FastifyInstance): void {
-    server.get<{ Params: TraderDetailParams }>(
+    server.get<{ Params: TraderDetailRequest }>(
       '/traders/:address',
-      async (request, reply: FastifyReply): Promise<TraderRiskResponse | FastifyReply> => {
+      async (request, reply: FastifyReply): Promise<TraderRiskDto | FastifyReply> => {
         const detail = await this.application.getTraderDetail(request.params.address);
         if (detail === null) {
           return reply.code(404).send({ error: 'trader not found' });
         }
-        return toTraderRiskResponse(detail);
+        return toTraderRiskDto(detail);
       },
     );
   }
