@@ -53,9 +53,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Domain 內部結構
 
+domain **只依「種類」分這四個資料夾**，不出現 `market` / `assembly` / `metrics` / `reconstruction` 等概念資料夾：
+
 - `entity/` — 實體（domain 物件；**非 `Dto` 結尾即視為 entity**）。**entity 絕不直接回傳給 application。**
 - `dto/` — Domain DTO：domain 對 application 的**唯一回傳形狀**（多轉一層，不外漏 entity）。
-- `service/` — **Domain Service**：application 的唯一呼叫入口。透過 `interface/` 的 repository/proxy 介面取得 entity、執行計算邏輯，再把 entity **轉成 DTO** 回傳。
+- `service/` — **Domain Service**：application 的唯一呼叫入口。透過 `interface/` 的 repository/proxy 介面取得 entity、執行計算邏輯，再把 entity **轉成 DTO** 回傳。命名 `XxxService`，**一個檔案只有一個 service class**。
 - `interface/` — repository / proxy 介面（一介面一檔）。
 - **計算行為放在 entity 的方法上**（Rich Domain Model，「讓 model 講話 / Tell, Don't Ask」）：service 取得 entity 後呼叫其方法。**禁止 helper 類別或散落的計算函式（壞味道）。** 跨多個 entity 的運算（如排行）才放 Domain Service。
 
@@ -131,9 +133,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `src/` 依分層架構組織，各層職責見其 `README.md`：
 
-- `src/domain/`（核心）：`interface/`（對外介面，一檔一介面）· `market/`（市場資料 value object：`traderFill`、`openPosition`、`leaderboardTrader`、`positionSnapshotRecord`）· `metrics/`（指標引擎）· `reconstruction/` · `assembly/` · `ranking/`
-- `src/application/`（用例編排，依賴 domain 介面；**無 ports 資料夾**）
-- `src/controller/`（Fastify 路由 + DTO/Request `type`）
+- `src/domain/`（核心，**只依種類分四個資料夾**）：`entity/`（充血 entity class）· `dto/`（回傳 DTO `type`）· `service/`（Domain Service，一檔一 class）· `interface/`（對外介面，一檔一介面）
+- `src/application/`（用例編排，呼叫 domain service；**無 ports 資料夾**）
+- `src/controller/`（Fastify 路由 + Request `type`）
 - `src/infrastructure/`：`persistence/`（Prisma repository）· `hyperliquid/`（proxy + `hyperliquidWire` 原始型別）
 - `src/shared/`（跨層工具）· `src/main.ts` / `src/server.ts`（組裝根）
 
