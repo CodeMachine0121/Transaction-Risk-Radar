@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import type { ITraderFill } from '../../application/ports/hyperliquidProxy';
+import type { ITraderFill } from '../../application/ports/iHyperliquidProxy';
 import type { IPositionLifecycleEvent, PositionSide } from '../metrics/averagingDown';
 
 export interface IReconstructedPosition {

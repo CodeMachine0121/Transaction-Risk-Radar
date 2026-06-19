@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import type { ITraderFill } from '@/application/ports/hyperliquidProxy';
+import type { ITraderFill } from '@/application/ports/iHyperliquidProxy';
 import { reconstructPositions } from '@/domain/reconstruction/reconstructPositions';
 
 interface IFillSpec {

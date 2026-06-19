@@ -4,7 +4,7 @@ import type {
   ILeaderboardTrader,
   IOpenPosition,
   ITraderFill,
-} from '../../application/ports/hyperliquidProxy';
+} from '../../application/ports/iHyperliquidProxy';
 
 // Hyperliquid 原始回應形狀（僅取本專案需要的欄位）。
 interface IRawLeaderboardRow {
@@ -39,19 +39,19 @@ interface IRawFill {
   tid: number;
 }
 
-export interface IHyperliquidHttpProxyOptions {
+export interface IHyperliquidProxyOptions {
   infoApiBaseUrl: string;
   statsDataBaseUrl: string;
   fetchFunction?: typeof fetch;
 }
 
 /** Proxy：以 HTTP 呼叫 Hyperliquid 公開讀取 API，並正規化為 domain/application 使用的型別。 */
-export class HyperliquidHttpProxy implements IHyperliquidProxy {
+export class HyperliquidProxy implements IHyperliquidProxy {
   private readonly infoApiBaseUrl: string;
   private readonly statsDataBaseUrl: string;
   private readonly fetchFunction: typeof fetch;
 
-  constructor(options: IHyperliquidHttpProxyOptions) {
+  constructor(options: IHyperliquidProxyOptions) {
     this.infoApiBaseUrl = options.infoApiBaseUrl;
     this.statsDataBaseUrl = options.statsDataBaseUrl;
     this.fetchFunction = options.fetchFunction ?? globalThis.fetch;

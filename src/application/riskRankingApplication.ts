@@ -1,7 +1,7 @@
 import { rankTradersByRiskScore } from '../domain/ranking/rankByRiskScore';
 import type { IRiskRankingQuery } from '../domain/ranking/rankByRiskScore';
 import type { TraderRiskSummary } from '../domain/ranking/traderRiskSummary';
-import type { ITraderMetricsRepository } from './ports/traderMetricsRepository';
+import type { ITraderMetricsRepository } from './ports/iTraderMetricsRepository';
 
 /** 用例：查詢風險導向排行（US-01）。編排 repository 讀取與 domain 排序邏輯。 */
 export class RiskRankingApplication {

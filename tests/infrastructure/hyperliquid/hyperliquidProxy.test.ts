@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { HyperliquidHttpProxy } from '@/infrastructure/hyperliquid/hyperliquidHttpProxy';
+import { HyperliquidProxy } from '@/infrastructure/hyperliquid/hyperliquidProxy';
 
 const jsonResponse = (body: object): Response =>
   new Response(JSON.stringify(body), {
@@ -7,14 +7,14 @@ const jsonResponse = (body: object): Response =>
     headers: { 'content-type': 'application/json' },
   });
 
-const buildProxy = (fetchFunction: typeof fetch): HyperliquidHttpProxy =>
-  new HyperliquidHttpProxy({
+const buildProxy = (fetchFunction: typeof fetch): HyperliquidProxy =>
+  new HyperliquidProxy({
     infoApiBaseUrl: 'https://api.hyperliquid.xyz',
     statsDataBaseUrl: 'https://stats-data.hyperliquid.xyz',
     fetchFunction,
   });
 
-describe('HyperliquidHttpProxy', () => {
+describe('HyperliquidProxy', () => {
   it('fetches and normalizes the leaderboard', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({

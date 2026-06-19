@@ -1,7 +1,7 @@
 import { assembleTraderPositionInputs } from '../domain/assembly/assembleTraderPositionInputs';
 import { computeTraderMetrics, type ITraderMetricsResult } from '../domain/metrics/traderMetrics';
-import type { ITraderMetricsWriter } from './ports/traderMetricsWriter';
-import type { ITraderPositionRepository } from './ports/traderPositionRepository';
+import type { ITraderMetricsWriter } from './ports/iTraderMetricsWriter';
+import type { ITraderPositionRepository } from './ports/iTraderPositionRepository';
 
 /**
  * 用例（US-05）：重算單一交易員的指標集。

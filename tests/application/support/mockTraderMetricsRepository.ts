@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { vi } from 'vitest';
-import type { ITraderMetricsRepository } from '@/application/ports/traderMetricsRepository';
+import type { ITraderMetricsRepository } from '@/application/ports/iTraderMetricsRepository';
 import type { TraderRiskSummary } from '@/domain/ranking/traderRiskSummary';
 
 /** 測試資料工廠：產生一筆交易員風險摘要。 */

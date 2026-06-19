@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
-import type { ITraderMetricsWriter } from '@/application/ports/traderMetricsWriter';
-import type { ITraderPositionRepository } from '@/application/ports/traderPositionRepository';
+import type { ITraderMetricsWriter } from '@/application/ports/iTraderMetricsWriter';
+import type { ITraderPositionRepository } from '@/application/ports/iTraderPositionRepository';
 import { RecomputeTraderMetricsApplication } from '@/application/recomputeTraderMetricsApplication';
 import type { IAssemblyPosition } from '@/domain/assembly/assembleTraderPositionInputs';
 import type { ITraderMetricsResult } from '@/domain/metrics/traderMetrics';

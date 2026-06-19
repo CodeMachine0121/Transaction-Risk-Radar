@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { ITraderMetricsRepository } from './application/ports/traderMetricsRepository';
+import type { ITraderMetricsRepository } from './application/ports/iTraderMetricsRepository';
 import { RiskRankingApplication } from './application/riskRankingApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { RiskRankingController } from './controller/riskRankingController';
