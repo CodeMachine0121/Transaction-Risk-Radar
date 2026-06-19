@@ -34,23 +34,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 資料來源 | **Hyperliquid 官方 REST API** | 第一版唯一來源（leaderboard、clearinghouseState 等）|
 | 對外交付 | **REST（pull）** | 第一版；SSE 即時推送列為後續階段 |
 
-## Architecture — Clean / Layered Architecture
+## Architecture — Clean / Onion Architecture
 
-嚴格分層，依賴方向由上而下，**各層之間一律以介面（interface）互動以達成 DIP（依賴倒置）**：
+**依賴方向一律指向 Domain（核心）；Domain 不依賴任何人。**
 
 ```
-Controller            ← HTTP 入口 (Fastify route handlers)，只負責請求/回應轉換
-  ↓ (interface)
-Application Service    ← 用例編排 (use case orchestration)，協調 domain 與 repository
-  ↓ (interface)
-Domain Service         ← 核心業務邏輯：指標計算、riskScore、攤平偵測等（純、可單元測試）
-  ↓ (interface)
-Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽象
+   Controller ───▶ Application ───▶ Domain ◀─── Infrastructure
+   (HTTP/Fastify)   (use cases)     (核心)        (Repository/Client/Proxy 實作)
+                                      ▲
+                         src/domain/interface/ 定義所有對外契約 (ports)
 ```
 
-- 上層只依賴下層的**介面**，不依賴具體實作；具體實作於組裝根（composition root）注入。
-- **核心領域邏輯（指標計算引擎）** 應為純函式 / 純 Domain Service，不依賴 I/O，便於 TDD。
-- 背景流程（與 REST 查詢解耦）：`synchronizeLeaderboard` → `pollTrader`（分層排程，BullMQ）→ 分析引擎重算 `trader_metrics`。查詢端只讀預算好的 `trader_metrics`。
+- **Domain（核心）**：實體、value object、領域邏輯（指標計算引擎，純函式、可 TDD），以及**所有對外契約（ports）**——契約集中在 `src/domain/interface/`。**Domain 不 import 任何其他層**（不認識 HTTP、Hyperliquid、Prisma…）。
+- **Application** 依賴 Domain：編排用例，透過 domain 的 port 取用 repository/proxy/client。
+- **Controller** 依賴 Application（與 domain 型別）：只負責 HTTP 請求/回應轉換。
+- **Infrastructure**（Repository / Client / Proxy 的**實作**）依賴 Domain：實作 `domain/interface/` 的 port（DIP——細節依賴抽象，抽象不依賴細節）。
+- 具體實作在組裝根（composition root：`main.ts` / `server.ts`）注入。
+- 指標計算引擎為純函式、不碰 I/O。背景流程（與查詢解耦）：`SyncLeaderboard` → `PollTrader`（BullMQ 排程）→ `RecomputeTraderMetrics`；查詢端只讀算好的 `trader_metrics`。
+
+> 註：程式碼正逐步對齊此規範（介面集中至 `domain/interface/`、資料形狀改 `type`）。
 
 ## Engineering Conventions（強制）
 
@@ -73,8 +75,12 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
   | Endpoint 接收的物件（querystring / params / body）| `Request` 後綴 |
   | Entity（我們的 domain 物件）| 以領域語彙命名（不加 `Dto`/`Request`）|
 
-  回應直接以 `Dto` 回傳，不另立 `Response` 型別。例：`ITraderRiskDto`（回應）、`IRiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity，`type` 別名）。
-- **介面一律以 `I` 前綴命名**：所有 `interface` 宣告皆加 `I`（如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`ITraderRiskDto`）。`type` 別名（如 `PositionSide`、`TraderRiskSummary`）不加 `I`。
+  這些資料物件一律是 **`type`**（見下），回應直接回傳、不另立 `Response` 型別。例：`TraderRiskDto`（回應）、`RiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity）。
+- **`interface` 只用於「行為契約 / port」**（會被 class 實作或被注入的相依）：如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`IPositionRepository`。一律 `I` 前綴，**集中放在 `src/domain/interface/`**。**實例檔（class / 函式模組）內不得宣告任何 `interface`。**
+- **資料形狀一律用 `type`，不用 `interface`、不加 `I`**：entity / value object / DTO / Request（如 `ReconstructedPosition`、`TraderRiskSummary`、`TraderRiskDto`、`RiskRankingRequest`）。
+- **固定資料形狀優先以泛型帶入契約**，而非為其定義具名資料介面：如 `IRepository<TEntity>`、`IResponse<TData>`。
+- **Presentation DTO 屬 delivery 細節**：放在 controller 旁（`type`），domain 不認識。
+- **外部 wire / vendor 形狀屬 infrastructure**：放在邊際層（`type`）；若外部 library 自帶型別，**只有邊際層依賴它**，domain 永不接觸。
 - **具體實作用「純角色名」**：實作不帶 `I`、**也不帶技術前綴**（class 名與檔名都是）。例：`ITraderMetricsRepository` 的實作是 `TraderMetricsRepository`（**不是** `PrismaTraderMetricsRepository`）；`IHyperliquidProxy` 的實作是 `HyperliquidProxy`（**不是** `HyperliquidHttpProxy`）。
 - **檔名必須對齊其主要型別/符號**（嚴格）：
   - 介面（port）檔 → `i` 前綴 camelCase，如 `iTraderMetricsRepository.ts`、`iHyperliquidProxy.ts`。
