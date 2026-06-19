@@ -57,7 +57,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `dto/` — Domain DTO：domain 對 application 的**唯一回傳形狀**（多轉一層，不外漏 entity）。
 - `service/` — **Domain Service**：application 的唯一呼叫入口。透過 `interface/` 的 repository/proxy 介面取得 entity、執行計算邏輯，再把 entity **轉成 DTO** 回傳。
 - `interface/` — repository / proxy 介面（一介面一檔）。
-- 計算邏輯歸 Domain Service（其內部可呼叫純計算 helper）。
+- **計算行為放在 entity 的方法上**（Rich Domain Model，「讓 model 講話 / Tell, Don't Ask」）：service 取得 entity 後呼叫其方法。**禁止 helper 類別或散落的計算函式（壞味道）。** 跨多個 entity 的運算（如排行）才放 Domain Service。
 
 **呼叫鏈**：`Application → DomainService → repository 介面（impl 在 infra）→ entity → service 轉 DTO → 回傳 DTO`。Application 全程不碰 entity。背景流程：`SyncLeaderboardService` → `PollTraderService`（BullMQ 排程）→ `RecomputeTraderMetricsService`。
 
@@ -76,19 +76,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   | Client | `Client` | infrastructure |
   | Proxy | `Proxy` | infrastructure |
 
-  純 domain 計算函式（如 `src/domain/metrics/` 的 `compute*`）維持函式命名；當把編排邏輯包成 domain service 物件時才加 `Service` 後綴。
+  `Service` 後綴僅用於跨 entity 的編排（取資料、轉 DTO、多 entity 運算）；單一 entity 的計算放 entity 自己的方法（不另立 service 或 helper）。
 
 - **資料物件命名**（domain model 只有 entity 與 dto 兩種）：
   | 類別 | 規則 |
   | :--- | :--- |
-  | Entity（domain 物件）| 以領域語彙命名，**不加 `Dto`**（非 `Dto` 結尾即 entity）；放 `domain/entity/` |
-  | Domain DTO（service 回傳給 application 的形狀）| `Dto` 後綴；放 `domain/dto/` |
-  | Endpoint 接收的物件（querystring / params / body）| `Request` 後綴；放 controller 旁 |
+  | Entity（domain 物件，**`class`，含資料與行為**）| 以領域語彙命名，**不加 `Dto`**；放 `domain/entity/` |
+  | Domain DTO（service 回傳給 application 的形狀，**`type`**）| `Dto` 後綴；放 `domain/dto/` |
+  | Endpoint 接收的物件（querystring / params / body，**`type`**）| `Request` 後綴；放 controller 旁 |
 
-  這些資料物件一律是 **`type`**，回應直接回傳、不另立 `Response` 型別。例：`TraderRiskDto`（service 回傳）、`RiskRankingRequest`（入站查詢）。
+  **Entity 用 `class`（充血、含行為）；DTO / Request / 無行為 value object 用 `type`。** 回應直接回傳、不另立 `Response`。例：`TraderRiskDto`（service 回傳）、`RiskRankingRequest`（入站查詢）。
 
 - **`interface` 只用於「行為契約」**（會被 class 實作或被注入的相依）：如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`IPositionRepository`。一律 `I` 前綴，**集中放在 `src/domain/interface/`，一個介面一個檔案（鐵則）**。**實例檔（class / 函式模組）內不得宣告任何 `interface`。不使用「port」一詞或資料夾。**
-- **資料形狀一律用 `type`，不用 `interface`、不加 `I`**：entity / value object / DTO / Request（如 `ReconstructedPosition`、`TraderRiskSummary`、`TraderRiskDto`、`RiskRankingRequest`）。
+- **純資料形狀用 `type`**（不用 `interface`、不加 `I`）：DTO / Request / 無行為的 value object（如 `TraderRiskDto`、`RiskRankingRequest`）。**Entity 是 `class`（含行為），不是 `type`。**
 - **固定資料形狀優先以泛型帶入契約**，而非為其定義具名資料介面：如 `IRepository<TEntity>`、`IResponse<TData>`。
 - **DTO 是 domain 的回傳邊界**：Domain Service 把 entity 轉成 DTO（`domain/dto/`，`type`、`Dto` 結尾）回傳給 application；**entity 不可外漏到 application/controller。**
 - **外部 wire / vendor 形狀屬 infrastructure**：放在邊際層（`type`）；若外部 library 自帶型別，**只有邊際層依賴它**，domain 永不接觸。
