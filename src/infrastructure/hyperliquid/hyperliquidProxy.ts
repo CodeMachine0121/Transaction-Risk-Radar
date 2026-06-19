@@ -1,8 +1,8 @@
 import Decimal from 'decimal.js';
 import type { IHyperliquidProxy } from '../../domain/interface/iHyperliquidProxy';
-import type { LeaderboardTrader } from '../../domain/market/leaderboardTrader';
-import type { OpenPosition } from '../../domain/market/openPosition';
-import type { TraderFill } from '../../domain/market/traderFill';
+import type { LeaderboardTrader } from '../../domain/vo/leaderboardTrader';
+import type { OpenPosition } from '../../domain/vo/openPosition';
+import type { TraderFill } from '../../domain/vo/traderFill';
 import type { RawClearinghouseState, RawFill, RawLeaderboardResponse } from './hyperliquidWire';
 
 export type HyperliquidProxyOptions = {

@@ -1,6 +1,6 @@
-import type { AssemblyPosition } from '../assembly/assembleTraderPositionInputs';
+import type { Position } from '../entity/position';
 
-/** 載入某交易員「重建倉位 + 其 snapshot 序列」的組裝輸入（由 infrastructure 重建並 join）。 */
+/** 載入某交易員的倉位（由 infrastructure 從 position_events + position_snapshots 建出 Position）。 */
 export interface ITraderPositionRepository {
-  findAssemblyPositions(traderAddress: string): Promise<AssemblyPosition[]>;
+  findPositions(traderAddress: string): Promise<Position[]>;
 }

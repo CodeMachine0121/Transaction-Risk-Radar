@@ -166,6 +166,11 @@ export class Trader {
     return this.metrics.insufficientData;
   }
 
+  /** 取得彙總指標快照供持久化（由 repository 寫入 trader_metrics）。 */
+  metricsSnapshot(): TraderMetrics {
+    return this.metrics;
+  }
+
   toRiskDto(): TraderRiskDto {
     const asText = (value: Decimal | null): string | null => (value === null ? null : value.toString());
     return {

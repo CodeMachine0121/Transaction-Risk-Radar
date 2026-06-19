@@ -1,44 +1,14 @@
-import Decimal from 'decimal.js';
-import type { IHyperliquidProxy } from '../domain/interface/iHyperliquidProxy';
-import type { OpenPosition } from '../domain/market/openPosition';
-import type { IPositionRepository } from '../domain/interface/iPositionRepository';
-import type { PositionSnapshotRecord } from '../domain/market/positionSnapshotRecord';
+import type { PollTraderService } from '../domain/service/pollTraderService';
 
-const ZERO = new Decimal(0);
-const HUNDRED = new Decimal(100);
-
-const toSnapshotRecord = (position: OpenPosition): PositionSnapshotRecord => {
-  const absoluteSize = position.signedSize.abs();
-  const entryNotional = position.entryPrice.times(absoluteSize);
-  return {
-    coin: position.coin,
-    markPrice: absoluteSize.isZero() ? ZERO : position.positionValue.dividedBy(absoluteSize),
-    unrealizedProfitAndLossPercentage: entryNotional.isZero()
-      ? ZERO
-      : position.unrealizedProfitAndLoss.dividedBy(entryNotional).times(HUNDRED),
-    margin: position.marginUsed,
-    leverage: position.leverage,
-  };
-};
-
-/**
- * 用例（US-04）：輪詢單一交易員。抓取成交寫入（→ events，repository 以 tradeId 去重），
- * 並對當前開倉拍下浮虧快照（ROI 法的未實現報酬率 + 由 positionValue 推得的 markPrice）。
- */
+/** 用例（US-04）：委派 PollTraderService 輪詢成交與開倉快照。 */
 export class PollTraderApplication {
-  private readonly proxy: IHyperliquidProxy;
-  private readonly positionRepository: IPositionRepository;
+  private readonly pollTraderService: PollTraderService;
 
-  constructor(proxy: IHyperliquidProxy, positionRepository: IPositionRepository) {
-    this.proxy = proxy;
-    this.positionRepository = positionRepository;
+  constructor(pollTraderService: PollTraderService) {
+    this.pollTraderService = pollTraderService;
   }
 
-  async poll(traderAddress: string, fillsSince: number): Promise<void> {
-    const fills = await this.proxy.fetchUserFills(traderAddress, fillsSince);
-    await this.positionRepository.saveFills(traderAddress, fills);
-
-    const openPositions = await this.proxy.fetchOpenPositions(traderAddress);
-    await this.positionRepository.saveSnapshots(traderAddress, openPositions.map(toSnapshotRecord));
+  poll(traderAddress: string, fillsSince: number): Promise<void> {
+    return this.pollTraderService.poll(traderAddress, fillsSince);
   }
 }

@@ -1,76 +1,64 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
+import { RecomputeTraderMetricsApplication } from '@/application/recomputeTraderMetricsApplication';
+import { Position } from '@/domain/entity/position';
+import { RecomputeTraderMetricsService } from '@/domain/service/recomputeTraderMetricsService';
 import type { ITraderMetricsWriter } from '@/domain/interface/iTraderMetricsWriter';
 import type { ITraderPositionRepository } from '@/domain/interface/iTraderPositionRepository';
-import { RecomputeTraderMetricsApplication } from '@/application/recomputeTraderMetricsApplication';
-import type { AssemblyPosition } from '@/domain/assembly/assembleTraderPositionInputs';
-import type { TraderMetricsResult } from '@/domain/metrics/traderMetrics';
+import type { TraderMetrics } from '@/domain/vo/traderMetrics';
 
-const assemblyPosition = (isClosed: boolean, hasSnapshot: boolean): AssemblyPosition => ({
-  reconstructed: {
-    coin: 'ETH',
+const closedPosition = (hasSnapshot: boolean, coin = 'ETH'): Position =>
+  new Position({
+    coin,
     side: 'long',
     events: [{ type: 'open', price: new Decimal(100), size: new Decimal(1) }],
+    snapshots: hasSnapshot
+      ? [{ unrealizedProfitAndLossPercentage: new Decimal(-10), leverage: new Decimal(10) }]
+      : [],
     realizedProfitAndLoss: new Decimal(10),
-    realizedReturnPercentage: new Decimal(10),
-    isClosed,
-  },
-  snapshots: hasSnapshot
-    ? [{ unrealizedProfitAndLossPercentage: new Decimal(-10), leverage: new Decimal(10) }]
-    : [],
+    closed: true,
+  });
+
+const createMockPositionRepository = (): ITraderPositionRepository => ({
+  findPositions: vi.fn<(traderAddress: string) => Promise<Position[]>>().mockResolvedValue([]),
 });
 
-const createPositionRepository = (): ITraderPositionRepository => ({
-  findAssemblyPositions: vi
-    .fn<(traderAddress: string) => Promise<AssemblyPosition[]>>()
-    .mockResolvedValue([]),
-});
-
-const createMetricsWriter = (): ITraderMetricsWriter => ({
+const createMockMetricsWriter = (): ITraderMetricsWriter => ({
   saveTraderMetrics: vi
-    .fn<(traderAddress: string, metrics: TraderMetricsResult) => Promise<void>>()
+    .fn<(traderAddress: string, metrics: TraderMetrics) => Promise<void>>()
     .mockResolvedValue(undefined),
 });
 
+// 真實 RecomputeTraderMetricsService（連帶真實 Trader/Position），只 mock repository / writer 介面。
 describe('RecomputeTraderMetricsApplication', () => {
-  it('loads positions, computes metrics, saves them, and returns the result', async () => {
-    const positionRepository = createPositionRepository();
-    vi.mocked(positionRepository.findAssemblyPositions).mockResolvedValue([
-      assemblyPosition(true, true),
-    ]);
-    const metricsWriter = createMetricsWriter();
-    const application = new RecomputeTraderMetricsApplication(positionRepository, metricsWriter);
+  it('loads positions, recomputes, persists, and returns a DTO', async () => {
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findPositions).mockResolvedValue([closedPosition(true)]);
+    const metricsWriter = createMockMetricsWriter();
+    const application = new RecomputeTraderMetricsApplication(
+      new RecomputeTraderMetricsService(positionRepository, metricsWriter),
+    );
 
-    const metrics = await application.recompute('0xA');
+    const dto = await application.recompute('0xA');
 
-    expect(positionRepository.findAssemblyPositions).toHaveBeenCalledWith('0xA');
-    expect(metrics.closedPositionCount).toBe(1);
-    expect(metricsWriter.saveTraderMetrics).toHaveBeenCalledWith('0xA', metrics);
-  });
-
-  it('excludes positions without snapshots before computing', async () => {
-    const positionRepository = createPositionRepository();
-    vi.mocked(positionRepository.findAssemblyPositions).mockResolvedValue([
-      assemblyPosition(true, true),
-      assemblyPosition(true, false),
-    ]);
-    const metricsWriter = createMetricsWriter();
-    const application = new RecomputeTraderMetricsApplication(positionRepository, metricsWriter);
-
-    const metrics = await application.recompute('0xA');
-
-    expect(metrics.closedPositionCount).toBe(1);
-  });
-
-  it('flags insufficient data and still persists when there are no positions', async () => {
-    const positionRepository = createPositionRepository();
-    const metricsWriter = createMetricsWriter();
-    const application = new RecomputeTraderMetricsApplication(positionRepository, metricsWriter);
-
-    const metrics = await application.recompute('0xA');
-
-    expect(metrics.insufficientData).toBe(true);
-    expect(metrics.closedPositionCount).toBe(0);
+    expect(positionRepository.findPositions).toHaveBeenCalledWith('0xA');
     expect(metricsWriter.saveTraderMetrics).toHaveBeenCalledOnce();
+    expect(dto.insufficientData).toBe(true); // 1 closed < minimum 20
+    expect(dto.closedPositionCount).toBe(1);
+  });
+
+  it('excludes positions without snapshots from the count', async () => {
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findPositions).mockResolvedValue([
+      closedPosition(true),
+      closedPosition(false, 'BTC'),
+    ]);
+    const application = new RecomputeTraderMetricsApplication(
+      new RecomputeTraderMetricsService(positionRepository, createMockMetricsWriter()),
+    );
+
+    const dto = await application.recompute('0xA');
+
+    expect(dto.closedPositionCount).toBe(1);
   });
 });

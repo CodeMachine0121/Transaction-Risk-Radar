@@ -1,5 +1,5 @@
-import type { PositionSnapshotRecord } from '../market/positionSnapshotRecord';
-import type { TraderFill } from '../market/traderFill';
+import type { PositionSnapshotRecord } from '../vo/positionSnapshotRecord';
+import type { TraderFill } from '../vo/traderFill';
 
 /** 持久化成交（轉成 events）與浮虧快照。 */
 export interface IPositionRepository {

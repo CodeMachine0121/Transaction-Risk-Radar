@@ -1,6 +1,6 @@
-import type { LeaderboardTrader } from '../market/leaderboardTrader';
-import type { OpenPosition } from '../market/openPosition';
-import type { TraderFill } from '../market/traderFill';
+import type { LeaderboardTrader } from '../vo/leaderboardTrader';
+import type { OpenPosition } from '../vo/openPosition';
+import type { TraderFill } from '../vo/traderFill';
 
 /**
  * 封裝 Hyperliquid 公開讀取 API（leaderboard / clearinghouseState / userFillsByTime）。

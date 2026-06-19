@@ -1,7 +1,8 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
-import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 import { SyncLeaderboardApplication } from '@/application/syncLeaderboardApplication';
+import { SyncLeaderboardService } from '@/domain/service/syncLeaderboardService';
+import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 
 const createMockTraderRepository = (): ITraderRepository => ({
@@ -18,7 +19,9 @@ describe('SyncLeaderboardApplication', () => {
       leaderboardTrader('0xB'),
     ]);
     const traderRepository = createMockTraderRepository();
-    const application = new SyncLeaderboardApplication(proxy, traderRepository);
+    const application = new SyncLeaderboardApplication(
+      new SyncLeaderboardService(proxy, traderRepository),
+    );
 
     const count = await application.sync();
 
@@ -34,9 +37,9 @@ describe('SyncLeaderboardApplication', () => {
       leaderboardTrader('0xC'),
     ]);
     const traderRepository = createMockTraderRepository();
-    const application = new SyncLeaderboardApplication(proxy, traderRepository, {
-      maximumTraders: 2,
-    });
+    const application = new SyncLeaderboardApplication(
+      new SyncLeaderboardService(proxy, traderRepository, { maximumTraders: 2 }),
+    );
 
     const count = await application.sync();
 

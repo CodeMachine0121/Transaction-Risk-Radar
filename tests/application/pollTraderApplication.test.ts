@@ -1,9 +1,11 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
-import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
-import type { PositionSnapshotRecord } from '@/domain/market/positionSnapshotRecord';
-import type { TraderFill } from '@/domain/market/traderFill';
 import { PollTraderApplication } from '@/application/pollTraderApplication';
+import { PollTraderService } from '@/domain/service/pollTraderService';
+import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
+import type { OpenPosition } from '@/domain/vo/openPosition';
+import type { PositionSnapshotRecord } from '@/domain/vo/positionSnapshotRecord';
+import type { TraderFill } from '@/domain/vo/traderFill';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 
 const createMockPositionRepository = (): IPositionRepository => ({
@@ -15,7 +17,7 @@ const createMockPositionRepository = (): IPositionRepository => ({
     .mockResolvedValue(undefined),
 });
 
-const openPosition = () => ({
+const openPosition = (): OpenPosition => ({
   coin: 'ETH',
   signedSize: new Decimal(2),
   entryPrice: new Decimal(100),
@@ -43,7 +45,7 @@ describe('PollTraderApplication', () => {
     const proxy = createMockHyperliquidProxy();
     vi.mocked(proxy.fetchUserFills).mockResolvedValue([fill()]);
     const positionRepository = createMockPositionRepository();
-    const application = new PollTraderApplication(proxy, positionRepository);
+    const application = new PollTraderApplication(new PollTraderService(proxy, positionRepository));
 
     await application.poll('0xA', 1000);
 
@@ -55,15 +57,13 @@ describe('PollTraderApplication', () => {
     const proxy = createMockHyperliquidProxy();
     vi.mocked(proxy.fetchOpenPositions).mockResolvedValue([openPosition()]);
     const positionRepository = createMockPositionRepository();
-    const application = new PollTraderApplication(proxy, positionRepository);
+    const application = new PollTraderApplication(new PollTraderService(proxy, positionRepository));
 
     await application.poll('0xA', 1000);
 
     const [, snapshots] = vi.mocked(positionRepository.saveSnapshots).mock.calls[0] ?? [];
     expect(snapshots?.[0]?.coin).toBe('ETH');
-    // unrealized 40 / (entryPrice 100 * size 2) * 100 = 20
     expect(snapshots?.[0]?.unrealizedProfitAndLossPercentage.toString()).toBe('20');
-    // positionValue 240 / size 2 = 120
     expect(snapshots?.[0]?.markPrice.toString()).toBe('120');
     expect(snapshots?.[0]?.leverage.toString()).toBe('10');
   });

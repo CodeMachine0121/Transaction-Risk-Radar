@@ -1,33 +1,14 @@
-import type { IHyperliquidProxy } from '../domain/interface/iHyperliquidProxy';
-import type { ITraderRepository } from '../domain/interface/iTraderRepository';
+import type { SyncLeaderboardService } from '../domain/service/syncLeaderboardService';
 
-export type SyncLeaderboardOptions = {
-  /** 同步的交易員數量上限（取 leaderboard 前 N 名）；未設定則全部同步。 */
-  maximumTraders?: number;
-};
-
-/** 用例（US-03）：從 Hyperliquid leaderboard 同步追蹤名單。回傳同步的交易員數。 */
+/** 用例（US-03）：委派 SyncLeaderboardService 同步追蹤名單。 */
 export class SyncLeaderboardApplication {
-  private readonly proxy: IHyperliquidProxy;
-  private readonly traderRepository: ITraderRepository;
-  private readonly maximumTraders: number | undefined;
+  private readonly syncLeaderboardService: SyncLeaderboardService;
 
-  constructor(
-    proxy: IHyperliquidProxy,
-    traderRepository: ITraderRepository,
-    options: SyncLeaderboardOptions = {},
-  ) {
-    this.proxy = proxy;
-    this.traderRepository = traderRepository;
-    this.maximumTraders = options.maximumTraders;
+  constructor(syncLeaderboardService: SyncLeaderboardService) {
+    this.syncLeaderboardService = syncLeaderboardService;
   }
 
-  async sync(): Promise<number> {
-    const leaderboard = await this.proxy.fetchLeaderboard();
-    const selected =
-      this.maximumTraders === undefined ? leaderboard : leaderboard.slice(0, this.maximumTraders);
-    const traderAddresses = selected.map((trader) => trader.address);
-    await this.traderRepository.saveTraders(traderAddresses);
-    return traderAddresses.length;
+  sync(): Promise<number> {
+    return this.syncLeaderboardService.sync();
   }
 }

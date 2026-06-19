@@ -1,25 +1,15 @@
-import { assembleTraderPositionInputs } from '../domain/assembly/assembleTraderPositionInputs';
-import { computeTraderMetrics, type TraderMetricsResult } from '../domain/metrics/traderMetrics';
-import type { ITraderMetricsWriter } from '../domain/interface/iTraderMetricsWriter';
-import type { ITraderPositionRepository } from '../domain/interface/iTraderPositionRepository';
+import type { TraderRiskDto } from '../domain/dto/traderRiskDto';
+import type { RecomputeTraderMetricsService } from '../domain/service/recomputeTraderMetricsService';
 
-/**
- * 用例（US-05）：重算單一交易員的指標集。
- * 載入組裝輸入 → assemble → computeTraderMetrics → 持久化，並回傳結果。
- */
+/** 用例（US-05）：委派 RecomputeTraderMetricsService 重算並持久化指標。 */
 export class RecomputeTraderMetricsApplication {
-  private readonly positionRepository: ITraderPositionRepository;
-  private readonly metricsWriter: ITraderMetricsWriter;
+  private readonly recomputeTraderMetricsService: RecomputeTraderMetricsService;
 
-  constructor(positionRepository: ITraderPositionRepository, metricsWriter: ITraderMetricsWriter) {
-    this.positionRepository = positionRepository;
-    this.metricsWriter = metricsWriter;
+  constructor(recomputeTraderMetricsService: RecomputeTraderMetricsService) {
+    this.recomputeTraderMetricsService = recomputeTraderMetricsService;
   }
 
-  async recompute(traderAddress: string): Promise<TraderMetricsResult> {
-    const positions = await this.positionRepository.findAssemblyPositions(traderAddress);
-    const metrics = computeTraderMetrics({ positions: assembleTraderPositionInputs(positions) });
-    await this.metricsWriter.saveTraderMetrics(traderAddress, metrics);
-    return metrics;
+  recompute(traderAddress: string): Promise<TraderRiskDto> {
+    return this.recomputeTraderMetricsService.recompute(traderAddress);
   }
 }
