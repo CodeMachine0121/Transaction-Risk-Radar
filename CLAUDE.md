@@ -74,7 +74,12 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
   | Entity（我們的 domain 物件）| 以領域語彙命名（不加 `Dto`/`Request`）|
 
   回應直接以 `Dto` 回傳，不另立 `Response` 型別。例：`ITraderRiskDto`（回應）、`IRiskRankingRequest`（入站查詢）、`TraderRiskSummary`（domain entity，`type` 別名）。
-- **介面一律以 `I` 前綴命名**：所有 `interface` 宣告皆加 `I`（如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`ITraderRiskDto`）。對應的具體實作 / 實例用**不帶 `I`** 的名稱（如 `PrismaTraderMetricsRepository`、`HyperliquidHttpProxy`）。`type` 別名（如 `PositionSide`、`TraderRiskSummary`）不加 `I`。
+- **介面一律以 `I` 前綴命名**：所有 `interface` 宣告皆加 `I`（如 `ITraderMetricsRepository`、`IHyperliquidProxy`、`ITraderRiskDto`）。`type` 別名（如 `PositionSide`、`TraderRiskSummary`）不加 `I`。
+- **具體實作用「純角色名」**：實作不帶 `I`、**也不帶技術前綴**（class 名與檔名都是）。例：`ITraderMetricsRepository` 的實作是 `TraderMetricsRepository`（**不是** `PrismaTraderMetricsRepository`）；`IHyperliquidProxy` 的實作是 `HyperliquidProxy`（**不是** `HyperliquidHttpProxy`）。
+- **檔名必須對齊其主要型別/符號**（嚴格）：
+  - 介面（port）檔 → `i` 前綴 camelCase，如 `iTraderMetricsRepository.ts`、`iHyperliquidProxy.ts`。
+  - 實作檔 → 純角色名 camelCase，如 `traderMetricsRepository.ts`、`hyperliquidProxy.ts`。
+  - 以函式為主的模組檔 → 跟著主要函式命名（如 `reconstructPositions.ts`、`assembleTraderPositionInputs.ts`）。
 - **TypeScript 禁用 `any` 與 `unknown`。** 一律給出明確型別。
 - **禁止「先宣告後賦值」。** 變數必須在宣告當下即賦值（不可先 `let x;` 之後再指派）。
 - **嚴禁 `private static` method。** 視為 code smell——應抽到對應物件成為其 instance method，透過實例呼叫。**單元測試除外。**
