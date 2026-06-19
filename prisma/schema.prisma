@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
+  // Prisma 7：連線 URL 移至 prisma.config.ts（供 Migrate/CLI），
+  // 執行時透過 @prisma/adapter-pg driver adapter 連線（見 src/infrastructure/persistence）。
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum PositionEventType {
