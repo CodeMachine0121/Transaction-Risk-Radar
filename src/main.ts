@@ -1,12 +1,12 @@
-import Fastify from 'fastify';
+import { createPrismaClient } from './infrastructure/persistence/prismaClient';
+import { PrismaTraderMetricsRepository } from './infrastructure/persistence/prismaTraderMetricsRepository';
+import { buildServer } from './server';
 
-// 組裝根 (composition root)：在此建立各層實作並注入介面依賴。
-// 第一版先提供 health 路由，業務路由將於 /tdd 階段逐步接上。
-const server = Fastify({ logger: true });
-
-server.get('/health', () => {
-  return { status: 'ok' };
-});
+// 組裝根 (composition root)：在此選定具體實作並注入。
+const connectionString = process.env.DATABASE_URL ?? '';
+const prismaClient = createPrismaClient(connectionString);
+const repository = new PrismaTraderMetricsRepository(prismaClient);
+const server = buildServer(repository, { logger: true });
 
 const port = Number(process.env.PORT ?? '3000');
 
