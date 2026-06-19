@@ -79,7 +79,7 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
 - `bun run format` / `bun run format:check` — Prettier
 - `bun run test` — 跑全部單元測試（Vitest）
 - `bun run test:watch` — watch 模式
-- 執行單一測試檔：`bunx vitest run src/path/to/file.test.ts`
+- 執行單一測試檔：`bunx vitest run tests/path/to/file.test.ts`
 - `bun run db:generate` — `prisma generate`
 - `bun run db:migrate` — `prisma migrate dev`（code-first migration）
 
@@ -89,3 +89,5 @@ Repository / Proxy     ← 資料存取 (ORM) 與外部 API (Hyperliquid) 的抽
 
 `src/` 依分層架構組織，各層職責見其 `README.md`：
 `src/controller/`（Fastify 路由）· `src/application/`（用例編排）· `src/domain/`（指標計算引擎，純邏輯）· `src/infrastructure/`（Prisma repository + Hyperliquid proxy）· `src/shared/`（跨層工具）· `src/main.ts`（組裝根 / server bootstrap）。
+
+**測試集中在 `tests/`**（不與原始碼並列），目錄結構鏡像 `src/`。測試一律用 **`@/` path alias** 匯入待測模組（`@/` → `src/`），例如 `import { normalize } from '@/domain/metrics/normalize'`；原始碼內部彼此仍用相對匯入。alias 同時設定於 `tsconfig.json`（`paths`）與 `vitest.config.ts`（`resolve.alias`）。

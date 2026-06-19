@@ -4,7 +4,7 @@ import {
   computeAveragingDownRatio,
   detectAveragingDown,
   type PositionLifecycleEvent,
-} from './averagingDown';
+} from '@/domain/metrics/averagingDown';
 
 const event = (
   type: PositionLifecycleEvent['type'],

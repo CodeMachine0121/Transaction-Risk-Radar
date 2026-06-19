@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { computeTrapSignal } from './trapSignal';
+import { computeTrapSignal } from '@/domain/metrics/trapSignal';
 
 describe('computeTrapSignal', () => {
   it('multiplies win rate by the normalized MAE', () => {

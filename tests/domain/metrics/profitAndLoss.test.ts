@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { computeRealizedProfitAndLoss, computeWinRate } from './profitAndLoss';
+import { computeRealizedProfitAndLoss, computeWinRate } from '@/domain/metrics/profitAndLoss';
 
 const toDecimals = (values: number[]): Decimal[] => values.map((value) => new Decimal(value));
 

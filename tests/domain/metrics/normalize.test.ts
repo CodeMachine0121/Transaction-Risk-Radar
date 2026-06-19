@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { normalize } from './normalize';
+import { normalize } from '@/domain/metrics/normalize';
 
 describe('normalize', () => {
   it('returns value/cap when within [0, 1]', () => {

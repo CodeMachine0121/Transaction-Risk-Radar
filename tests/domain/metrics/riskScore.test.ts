@@ -4,7 +4,7 @@ import {
   computeRiskScore,
   DEFAULT_RISK_SCORE_WEIGHTS,
   type RiskScoreComponents,
-} from './riskScore';
+} from '@/domain/metrics/riskScore';
 
 const components = (values: {
   mae: number;

@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { computeTraderMetrics, type TraderPositionInput } from './traderMetrics';
+import { computeTraderMetrics, type TraderPositionInput } from '@/domain/metrics/traderMetrics';
 
 const longPosition = (overrides: Partial<TraderPositionInput> = {}): TraderPositionInput => ({
   side: 'long',

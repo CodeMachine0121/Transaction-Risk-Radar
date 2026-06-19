@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeMaxAdverseExcursionPercentile90,
   computeMaxAdverseExcursionPerPosition,
-} from './maxAdverseExcursion';
+} from '@/domain/metrics/maxAdverseExcursion';
 
 const toDecimals = (values: number[]): Decimal[] => values.map((value) => new Decimal(value));
 

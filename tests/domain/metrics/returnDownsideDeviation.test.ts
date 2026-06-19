@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { computeReturnDownsideDeviation } from './returnDownsideDeviation';
+import { computeReturnDownsideDeviation } from '@/domain/metrics/returnDownsideDeviation';
 
 const toDecimals = (values: number[]): Decimal[] => values.map((value) => new Decimal(value));
 
