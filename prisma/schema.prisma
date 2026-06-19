@@ -68,7 +68,6 @@ model PositionEvent {
   type        PositionEventType
   price       Decimal           @db.Decimal(38, 18)
   size        Decimal           @db.Decimal(38, 18)
-  leverage    Decimal           @db.Decimal(18, 4)
   occurredAt  DateTime          @map("occurred_at")
 
   position Position @relation(fields: [positionId], references: [id])
@@ -84,6 +83,8 @@ model PositionSnapshot {
   markPrice                         Decimal  @map("mark_price") @db.Decimal(38, 18)
   unrealizedProfitAndLossPercentage Decimal  @map("unrealized_profit_and_loss_percentage") @db.Decimal(18, 8)
   margin                            Decimal  @db.Decimal(38, 18)
+  // 槓桿來自 poll clearinghouseState（fills 不含槓桿）；averageLeverage = 倉位 snapshots 的槓桿平均。
+  leverage                          Decimal  @db.Decimal(18, 4)
   capturedAt                        DateTime @map("captured_at")
 
   position Position @relation(fields: [positionId], references: [id])
