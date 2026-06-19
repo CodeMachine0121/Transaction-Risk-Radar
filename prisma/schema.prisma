@@ -98,6 +98,7 @@ model TraderMetrics {
   maxAdverseExcursionPercentile90 Decimal? @map("max_adverse_excursion_percentile_90") @db.Decimal(18, 8)
   averagingDownRatio              Decimal? @map("averaging_down_ratio") @db.Decimal(9, 8)
   winRate                         Decimal? @map("win_rate") @db.Decimal(9, 8)
+  realizedProfitAndLoss           Decimal? @map("realized_profit_and_loss") @db.Decimal(38, 18)
   returnDownsideDeviation         Decimal? @map("return_downside_deviation") @db.Decimal(18, 8)
   averageLeverage                 Decimal? @map("average_leverage") @db.Decimal(18, 4)
   trapSignal                      Decimal? @map("trap_signal") @db.Decimal(9, 8)
