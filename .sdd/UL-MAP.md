@@ -1,0 +1,95 @@
+# 📔 Ubiquitous Language Map
+
+**Project:** Trader Risk Radar
+**Bounded Context:** Hyperliquid 鏈上永續合約交易員的風險分析與排行
+**Maintainer:** James (james.hsueh@cafler.com)
+**Last Updated:** 2026-06-19
+
+> **命名慣例：所有 Technical Name 與程式識別字一律使用全名，禁止縮寫。**
+> 程式碼識別字用 camelCase 全名（如 `maxAdverseExcursion`）；資料庫表 / 欄位用 snake_case 全名（如 `position_events`、`unrealized_profit_and_loss_percentage`）。領域術語欄位（Domain Term）可保留人類習慣的簡稱（如 MAE）作閱讀用，但其對應識別字必為全名。
+
+---
+
+## 1. Nouns & Concepts
+*Records entities, value objects, attributes and their correspondence between code and real business.*
+
+| Domain Term | Technical Name | User-Facing Label | Definition & Business Rules | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| 交易員 Trader | `traders` / `trader` | Trader | 被追蹤分析的鏈上錢包地址。來源為 Hyperliquid leaderboard。以地址為唯一識別。 | Confirmed |
+| 倉位 Position | `positions` / `position` | Position | 交易員針對某一標的（coin）的一筆持倉，有方向（多/空）。生命週期：開倉 → (加倉/減倉)* → 平倉。 | Confirmed |
+| 逐筆動作 Position Event | `position_events` | — | 倉位生命週期中的每一個動作（開/加/減/平），記錄 price、size、leverage、timestamp。是偵測攤平行為的依據。 | Confirmed |
+| 浮虧快照 Snapshot | `position_snapshots` | — | 每次輪詢對每個開倉拍下的時間切片，記錄 mark_price、unrealized_profit_and_loss_percentage、margin、timestamp。是計算 MAE 的依據。 | Confirmed |
+| 最大逆向幅度 MAE | `maxAdverseExcursionPerPosition` | Max Adverse Excursion | 單一倉位生命週期內最深的浮虧百分比，即 `min(unrealizedProfitAndLossPercentage)`。代表跟單所需的最大回撤緩衝。 | Confirmed |
+| 最大逆向幅度第90百分位 | `maxAdverseExcursionPercentile90` | MAE (p90) | 交易員所有倉位 `|maxAdverseExcursionPerPosition|` 的第 90 百分位。代表「90% 的倉位最深都在此幅度內」。 | Confirmed |
+| 攤平 / 馬丁格爾 Averaging-down | `isAveragingDown` | Martingale / Averaging-down | 交易員在倉位虧損中（`unrealizedProfitAndLossPercentage < 0`）以遞增 size 加倉的行為。標記為高危。 | Confirmed |
+| 攤平比例 Averaging-down Ratio | `averagingDownRatio` | Averaging-down Ratio | 有攤平行為的倉位數 / 總倉位數。越高越偏馬丁格爾、越危險。 | Confirmed |
+| 已實現盈虧 Realized PnL | `realizedProfitAndLoss` | Realized PnL | 倉位平倉後實際結算的盈虧。 | Confirmed |
+| 單筆報酬率 Per-position Return | `realizedReturnPercentagePerPosition` | Return per Trade | 單一已平倉位的已實現報酬率，是計算勝率與下行標準差的基礎序列。 | Confirmed |
+| 勝率 Win Rate | `winRate` | Win Rate | 近 90 天內，獲利已平倉位 / 總已平倉位。 | Confirmed |
+| 下行標準差 Downside Deviation | `returnDownsideDeviation` | Downside Deviation | 近 90 天每筆 `realizedReturnPercentagePerPosition` 中，僅取負報酬部分計算的標準差。衡量「賠的時候穩不穩、會不會突然爆一筆」。越高越危險。 | Confirmed |
+| 平均槓桿 Average Leverage | `averageLeverage` | Average Leverage | 交易員倉位的平均名目槓桿倍數。 | Confirmed |
+| 陷阱訊號 Trap Signal | `trapSignal` | Trap Signal | `winRate × normalize(maxAdverseExcursionPercentile90)`。抓「高勝率（看似穩）但倉位偷偷扛很深」的馬丁格爾陷阱。 | Confirmed |
+| 風險分數 Risk Score | `riskScore` | Risk Score | 0–100，越高越危險。由 MAE、攤平比例、陷阱訊號、下行標準差、平均槓桿加權組成（見 PRD 第 4 章公式）。**衡量「跟單有多危險」，刻意不獎勵報酬率。** | Confirmed |
+| 交易員指標 Trader Metrics | `trader_metrics` | — | 一位交易員經分析引擎計算後的彙總指標集（上述所有指標 + riskScore）。 | Confirmed |
+| 風險排行 Risk Ranking | `riskRanking` | Risk Ranking | 依 riskScore 排序的交易員列表（風險導向，非報酬排名），為核心對外輸出。預設由低到高（安全在前），可切為由高到低（黑名單）。 | Confirmed |
+| 樣本不足 Insufficient Data | `insufficientData` | Insufficient Data | 已平倉位數 < `minimumClosedPositions`（預設 20）的交易員標記，不給 riskScore。 | Confirmed |
+| 排行榜 Leaderboard | `leaderboard` | Leaderboard | Hyperliquid 官方交易員排行榜，為自動拉取交易員清單的來源。 | Confirmed |
+| 標的 Coin | `coin` | Coin | 永續合約交易標的（如 BTC、ETH）。 | Confirmed |
+| 槓桿 Leverage | `leverage` | Leverage | 倉位的名目槓桿倍數。 | Confirmed |
+| 保證金 Margin | `margin` | Margin | 倉位所佔用的保證金。 | Confirmed |
+
+---
+
+## 2. Actions & Processes
+*Records business operations, function logic, and their corresponding business actions.*
+
+| Business Action | Technical Method | Trigger | Business Impact | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| 同步交易員清單 Sync Traders | `synchronizeLeaderboard` | 背景作業定時觸發 | 從 Hyperliquid leaderboard 拉取並去重，更新 `traders` 清單 | 須處理分頁與限流 |
+| 輪詢交易員資料 Poll Trader | `pollTrader` | 分層排程（高排名勤、長尾鬆） | 撈取持倉/成交，寫入 `position_events` 與 `position_snapshots` | 以成交唯一 id 去重 (idempotency) |
+| 計算最大逆向幅度 | `computeMaxAdverseExcursion` | 分析引擎排程 | 由 snapshots 算出每倉位與 p90 的 MAE，寫回 `trader_metrics` | |
+| 偵測攤平 Detect Averaging-down | `detectAveragingDown` | 分析引擎排程 | 掃描 `position_events`，標記虧損中遞增加倉，計算 `averagingDownRatio` | 核心差異化邏輯 |
+| 計算盈虧與勝率 | `computeProfitAndLossStatistics` | 分析引擎排程 | 由近 90 天已平倉位算出 `realizedProfitAndLoss`、`winRate` | 時間窗 = 近 90 天 |
+| 計算下行標準差 | `computeReturnDownsideDeviation` | 分析引擎排程 | 由近 90 天每筆報酬率的負報酬部分算出 `returnDownsideDeviation` | 衡量盈虧穩定度 |
+| 計算陷阱訊號 | `computeTrapSignal` | 分析引擎排程 | `winRate × normalize(maxAdverseExcursionPercentile90)` | |
+| 計算風險分數 | `computeRiskScore` | 分析引擎排程 | 加權組合各指標為 `riskScore`，供排行排序 | 權重見 PRD 第 4 章 |
+| 查詢風險排行 Query Risk Ranking | `getRiskRanking` (`GET /rankings`) | 使用者呼叫 REST API | 回傳依 riskScore 排序的交易員列表 | 支援排序/分頁 |
+| 查詢交易員詳情 Query Trader | `getTraderDetail` (`GET /traders/:address`) | 使用者呼叫 REST API | 回傳單一交易員的完整指標、攤平標記、MAE | |
+
+---
+
+## 3. Ambiguities & Conflicts
+*Records cases where the same technical term means different things in different modules, or multiple terms refer to the same concept.*
+
+| Ambiguous Term | Meaning in Context A | Meaning in Context B | Resolution |
+| :--- | :--- | :--- | :--- |
+| 排行 Ranking | Hyperliquid 官方「Leaderboard」（依報酬排名） | 本系統「Risk Ranking」（依 riskScore 排名） | 官方來源稱 **Leaderboard**，本系統輸出稱 **Risk Ranking**，不混用「排行」 |
+| 回撤 Drawdown | 單一倉位浮虧深度（即 MAE） | 帳戶整體權益回撤 | 第一版只談倉位層級 → 一律用 **MAE**；帳戶層級回撤不納入 |
+| PnL | 已實現盈虧 (Realized) | 未實現浮動盈虧 (Unrealized) | 浮動值稱 `unrealizedProfitAndLossPercentage`；結算值稱 `realizedProfitAndLoss`，不單用 "pnl" |
+| 波動 Volatility | 全標準差（含上行） | 下行標準差（僅負報酬） | 第一版風險指標一律用 **下行標準差** `returnDownsideDeviation`，不用全標準差 |
+
+---
+
+## 4. External & Enum Mapping
+*Records magic numbers/strings in code and their real business meaning.*
+
+| Category | Code Value / Key | Domain Label | Description |
+| :--- | :--- | :--- | :--- |
+| Position Event Type | `open` | 開倉 | 倉位首次建立 |
+| Position Event Type | `add` | 加倉 | 增加倉位 size（虧損中的 add 是攤平偵測重點） |
+| Position Event Type | `reduce` | 減倉 | 部分平倉 |
+| Position Event Type | `close` | 平倉 | 倉位完全結束 |
+| Position Status | `open` | 持倉中 | 倉位尚未平倉 |
+| Position Status | `closed` | 已平倉 | 倉位已結束，納入盈虧/勝率/下行標準差統計 |
+| Position Side | `long` | 多單 | 做多方向 |
+| Position Side | `short` | 空單 | 做空方向 |
+| Risk Ranking Sort | `ascending` | 安全在前 | 預設：riskScore 由低到高，找相對安全可跟的交易員 |
+| Risk Ranking Sort | `descending` | 高危在前 | 黑名單模式：riskScore 由高到低 |
+
+---
+
+## Quick Start Guide
+1. **Archeology** — read source code; fill `Technical Name` with raw names found in the codebase.
+2. **Mapping** — check UI screens or ask business stakeholders; fill `Domain Term` with the correct canonical name.
+3. **Refine** — add business rules (e.g., "this field cannot be negative", "this action must occur after checkout").
+4. **Sync** — this document is the single authoritative dictionary for all future renaming, refactoring, and new documentation.
