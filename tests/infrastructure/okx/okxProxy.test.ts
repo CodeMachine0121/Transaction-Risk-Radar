@@ -104,6 +104,78 @@ describe('OkxProxy', () => {
     expect(activities.every((a) => a.sourceReference.startsWith('NEW'))).toBe(true);
   });
 
+  it('skips incomplete history sub-positions (empty fields, e.g. net mode)', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      okxResponse([
+        {
+          instId: '',
+          posSide: 'net',
+          openAvgPx: '',
+          subPos: '',
+          openTime: '2000',
+          closeAvgPx: '',
+          closeTime: '',
+          pnl: '',
+          lever: '1',
+          subPosId: 'BAD',
+        },
+        {
+          instId: 'BTC-USDT-SWAP',
+          posSide: 'short',
+          openAvgPx: '80000',
+          subPos: '2',
+          openTime: '2000',
+          closeAvgPx: '78000',
+          closeTime: '3000',
+          pnl: '4000',
+          lever: '10',
+          subPosId: 'S1',
+        },
+      ]),
+    );
+
+    const activities = await buildProxy(fetchMock).fetchPositionActivities('CODE', 0);
+
+    expect(activities).toHaveLength(2);
+    expect(activities.every((a) => a.sourceReference.startsWith('S1'))).toBe(true);
+  });
+
+  it('skips incomplete current sub-positions (empty fields, e.g. net mode)', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      okxResponse([
+        {
+          instId: '',
+          posSide: 'net',
+          openAvgPx: '',
+          subPos: '',
+          lever: '100',
+          margin: '55',
+          markPx: '',
+          upl: '204',
+          uplRatio: '3.7',
+          subPosId: 'BAD',
+        },
+        {
+          instId: 'ETH-USDT-SWAP',
+          posSide: 'long',
+          openAvgPx: '100',
+          subPos: '2',
+          lever: '10',
+          margin: '20',
+          markPx: '120',
+          upl: '40',
+          uplRatio: '0.2',
+          subPosId: 'C1',
+        },
+      ]),
+    );
+
+    const positions = await buildProxy(fetchMock).fetchOpenPositions('CODE');
+
+    expect(positions).toHaveLength(1);
+    expect(positions[0]?.coin).toBe('ETH-USDT-SWAP');
+  });
+
   it('normalizes current sub-positions into open positions (markPrice = markPx)', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       okxResponse([

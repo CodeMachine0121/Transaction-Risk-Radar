@@ -89,6 +89,16 @@ export class OkxProxy implements ITraderDataProxy {
       if (Number(subPosition.openTime) < since) {
         continue;
       }
+      // OKX 偶有「net 模式」殘缺列（instId/價量為空）→ 無法重建,略過。
+      if (
+        subPosition.instId === '' ||
+        subPosition.openAvgPx === '' ||
+        subPosition.subPos === '' ||
+        subPosition.closeAvgPx === '' ||
+        subPosition.closeTime === ''
+      ) {
+        continue;
+      }
       const size = new Decimal(subPosition.subPos);
       const longSide = subPosition.posSide === 'long';
       const openSignedSize = longSide ? size : size.negated();
@@ -122,10 +132,19 @@ export class OkxProxy implements ITraderDataProxy {
     const subPositions = await this.getJson<RawOkxCurrentSubposition[]>(
       `/api/v5/copytrading/public-current-subpositions?instType=${instType}&uniqueCode=${address}`,
     );
-    return subPositions.map((subPosition) => {
-      const size = new Decimal(subPosition.subPos);
-      const longSide = subPosition.posSide === 'long';
-      const markPrice = new Decimal(subPosition.markPx);
+    return subPositions
+      .filter(
+        (subPosition) =>
+          // OKX 偶有「net 模式」殘缺列（instId/價量為空）→ 無法成倉,略過。
+          subPosition.instId !== '' &&
+          subPosition.openAvgPx !== '' &&
+          subPosition.subPos !== '' &&
+          subPosition.markPx !== '',
+      )
+      .map((subPosition) => {
+        const size = new Decimal(subPosition.subPos);
+        const longSide = subPosition.posSide === 'long';
+        const markPrice = new Decimal(subPosition.markPx);
       return {
         coin: subPosition.instId,
         signedSize: longSide ? size : size.negated(),
