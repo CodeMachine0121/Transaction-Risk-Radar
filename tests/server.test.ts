@@ -21,7 +21,9 @@ const currentPosition = (
   coin,
   signedSize: new Decimal(signedSize),
   leverage: new Decimal(10),
+  positionNotional: new Decimal(Math.abs(signedSize) * 100),
   capturedAt: 1000,
+  firstObservedAt: 1000,
 });
 
 let server: FastifyInstance | null = null;
@@ -191,6 +193,14 @@ describe('HTTP API', () => {
     server = buildServer(createMockTraderRepository(), createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/consensus?minParticipants=0' });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('GET /consensus rejects an unknown weighting with 400', async () => {
+    server = buildServer(createMockTraderRepository(), createMockPositionRepository());
+
+    const response = await server.inject({ method: 'GET', url: '/consensus?weighting=bogus' });
 
     expect(response.statusCode).toBe(400);
   });

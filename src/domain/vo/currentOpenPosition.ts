@@ -10,6 +10,10 @@ export type CurrentOpenPosition = {
   /** 帶號持倉量：正=多、負=空。 */
   signedSize: Decimal;
   leverage: Decimal;
-  /** 快照時刻（ms epoch）。 */
+  /** 名目價值 = |signedSize| × markPrice。conviction 加權的基礎。 */
+  positionNotional: Decimal;
+  /** 最新快照時刻（ms epoch）。 */
   capturedAt: number;
+  /** 新鮮度窗內該 (trader, coin) 最早觀測到的快照時刻（ms epoch）；窗內粗略持倉年齡用。 */
+  firstObservedAt: number;
 };
