@@ -18,6 +18,8 @@ export type SchedulerOptions = {
   recomputeIntervalMs: number;
   /** poll 抓取成交的回看時間窗（ms）。 */
   pollLookbackMs: number;
+  /** 單一 trader 處理失敗時的回報（不中斷整批）；未提供則寫 stderr。 */
+  onTraderError?: (phase: 'poll' | 'recompute', traderAddress: string, error: Error) => void;
 };
 
 /**
@@ -40,13 +42,13 @@ export class Scheduler {
       await this.applications.syncLeaderboardApplication.sync();
     });
     await this.registerRepeatable('poll-trader', this.options.pollIntervalMs, async () => {
-      await this.pollAll();
+      await this.pollAllTraders();
     });
     await this.registerRepeatable(
       'recompute-metrics',
       this.options.recomputeIntervalMs,
       async () => {
-        await this.recomputeAll();
+        await this.recomputeAllTraders();
       },
     );
   }
@@ -67,18 +69,48 @@ export class Scheduler {
     await queue.add(name, {}, { repeat: { every: everyMilliseconds } });
   }
 
-  private async pollAll(): Promise<void> {
+  /** 輪詢每位 trader；單一失敗只回報不中斷整批。 */
+  async pollAllTraders(): Promise<void> {
     const addresses = await this.applications.traderRepository.findAllAddresses();
     const fillsSince = Date.now() - this.options.pollLookbackMs;
     for (const address of addresses) {
-      await this.applications.pollTraderApplication.poll(address, fillsSince);
+      try {
+        await this.applications.pollTraderApplication.poll(address, fillsSince);
+      } catch (caught) {
+        this.reportTraderError(
+          'poll',
+          address,
+          caught instanceof Error ? caught : new Error(String(caught)),
+        );
+      }
     }
   }
 
-  private async recomputeAll(): Promise<void> {
+  /** 重算每位 trader 的指標；單一失敗只回報不中斷整批。 */
+  async recomputeAllTraders(): Promise<void> {
     const addresses = await this.applications.traderRepository.findAllAddresses();
     for (const address of addresses) {
-      await this.applications.recomputeTraderMetricsApplication.recompute(address);
+      try {
+        await this.applications.recomputeTraderMetricsApplication.recompute(address);
+      } catch (caught) {
+        this.reportTraderError(
+          'recompute',
+          address,
+          caught instanceof Error ? caught : new Error(String(caught)),
+        );
+      }
     }
+  }
+
+  private reportTraderError(
+    phase: 'poll' | 'recompute',
+    traderAddress: string,
+    error: Error,
+  ): void {
+    if (this.options.onTraderError) {
+      this.options.onTraderError(phase, traderAddress, error);
+      return;
+    }
+    process.stderr.write(`[scheduler:${phase}] ${traderAddress} failed: ${error.message}\n`);
   }
 }
