@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 執行環境    | **Node.js**                           |                                                                                                                                                                                                                                                                                                                 |
 | Web 框架    | **Fastify**                           | REST API（Controller 層）。比 Express 快、TS 支援好；不選 NestJS（對 solo 過重）                                                                                                                                                                                                                                |
 | ORM         | **Prisma 7**                          | 資料存取；`schema.prisma` 為 code-first 單一來源（v7：不含 `url`）。連線 URL 在 `prisma.config.ts`（供 CLI/Migrate）；執行時用 **`@prisma/adapter-pg`**（`pg` driver adapter）連線，工廠在 `src/infrastructure/persistence/prismaClient.ts`。透過型別安全 client 存取、禁手寫 SQL；金額欄用 `Decimal`，不用浮點 |
-| 資料庫      | **PostgreSQL + TimescaleDB**          | 時序資料（`position_fills`、`position_snapshots`）；Timescale 擴充加速時間窗查詢                                                                                                                                                                                                                               |
+| 資料庫      | **PostgreSQL + TimescaleDB**          | 時序資料（`position_fills`、`position_snapshots`）；Timescale 擴充加速時間窗查詢                                                                                                                                                                                                                                |
 | 快取 / 佇列 | **Redis**                             | BullMQ 後端、即時狀態快取                                                                                                                                                                                                                                                                                       |
 | 背景作業    | **BullMQ**                            | leaderboard 同步、分層輪詢、分析引擎排程                                                                                                                                                                                                                                                                        |
 | 鏈上互動    | **viem**（後續接 EVM 協議時）         | TS-first；第一版打 Hyperliquid 官方 API 可能用不到                                                                                                                                                                                                                                                              |
@@ -129,8 +129,24 @@ domain **只依「種類」分這五個資料夾**，不出現 `market` / `assem
 - 執行單一測試檔：`bunx vitest run tests/path/to/file.test.ts`
 - `bun run db:generate` — `prisma generate`
 - `bun run db:migrate` — `prisma migrate dev`（code-first migration）
+- `bun run worker` — 啟動背景 BullMQ 排程（sync → poll → recompute）
+
+本機服務（Postgres+TimescaleDB / Redis）：`docker compose up -d`（見 `docker-compose.yml`）。
+
+完整啟動流程：
+
+```
+docker compose up -d          # 起 Postgres + Redis
+cp .env.example .env          # 設定環境變數
+bun install                   # postinstall 會自動 prisma generate
+bunx prisma migrate deploy    # 套用 migration（或 bun run db:migrate）
+bun run worker                # 背景同步/輪詢/重算
+bun run start                 # REST API（/health、/rankings、/traders/:address）
+```
 
 > 環境變數見 `.env.example`（複製為 `.env`）。Prisma 指令需要 `DATABASE_URL`。
+> 選用：migration 後可將 `position_snapshots` 轉為 TimescaleDB hypertable：
+> `SELECT create_hypertable('position_snapshots', 'captured_at', migrate_data => true);`
 
 ## Layout
 
