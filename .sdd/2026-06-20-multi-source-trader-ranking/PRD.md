@@ -115,12 +115,20 @@
 
 ---
 
-## 8. Appendix — Open Decisions（待 sdd-arch / 實測校準）
+## 8. Appendix — Open Decisions
 
-1. **實測確認 OKX sub-position = per-open-order**：對真實帶單員打 `public-subpositions-history`，驗證分批加倉回多筆；評估「同 subPosId 內部加倉」盲點影響。
-2. **OKX 邏輯倉位歸併口徑**（影響指標正確性）：每筆 sub-position 當一個倉位，或同標的多筆歸併成一個「開→平」邏輯倉位？建議：**歸併**（與 HL fills 重建一致），每筆 sub-position 視為 open/add tranche。
-3. **OKX 認證**：`public-*` 是否需 API key/passphrase。
-4. **跨源排行形態**：統一一張榜 vs 分場所榜；統一時的代表性/加權政策。建議：**先分場所榜 + provider 標籤**，統一榜待代表性政策定案。
-5. **限流抽象**：是否抽出共用 `IRateLimiter` 供各 provider proxy 注入。
+### 已解（Phase 2 實作 + 真實 OKX 公開 API 驗證）
+
+1. ✅ **OKX sub-position = per-open-order**：實測「Steady first」BTC-USDT-SWAP 回 37 筆獨立 sub-position（各帶 `openAvgPx/openTime/subPos`）→ 加倉路徑可見、攤平可算。剩餘盲點「同 subPosId 內部加倉」影響小、列為已知限制。
+2. ✅ **OKX 邏輯倉位歸併**：採**歸併**——每筆 sub-position 拆成 open/close 兩條 `TraderActivity`，依時間排序交由**統一** `Position.reconstruct` 拼成邏輯倉位、偵測攤平。
+3. ✅ **OKX 認證**：`public-*` copytrading 端點**免金鑰**（實測 `code:0`）。
+4. ✅ **跨源排行形態**：統一一張榜帶 `provider` 欄位 + `?provider=` 篩選（兩源指標集一致，含攤平）。
+
+> 端到端驗證：10 個帶單員中 6 個有公開部位者皆成功 reconstruct 並偵測到攤平（2/6/2/4/10/3 筆）；4 個私密部位以 per-trader 隔離跳過。
+
+### 待後續
+
+5. **限流抽象**：是否抽出共用 `IRateLimiter` 供各 provider proxy 注入（目前各自內建 `RequestWeightLimiter`）。
 6. **Hyperliquid wire 是否改用 SDK**（`@nktkas/hyperliquid`）——可選優化。
+7. **OKX uplRatio/ROE 口徑**：目前未實現% 以 ROI on notional 與 HL 對齊；若要改用 OKX 原生 `uplRatio` 需確認其分母定義。
 7. 相關文件：主 PRD `.sdd/2026-06-19-trader-risk-radar/PRD.md`（§4 指標公式、倉位重建）；`.sdd/UL-MAP.md`（已新增 `provider`、`leadTrader`、`subPosition`、`ingestTraderData`、`reconstructPositionsFromSubPositions`）。
