@@ -91,6 +91,21 @@ model TraderMetrics {
   @@map("trader_metrics")
 }
 
+/// 每輪安全群共識的時序留存；回測（對照之後價格）的歷史輸入。
+model ConsensusSnapshot {
+  id                              String   @id @default(uuid())
+  coin                            String
+  netDirectionBias                Decimal  @map("net_direction_bias") @db.Decimal(20, 18)
+  convictionWeightedDirectionBias Decimal  @map("conviction_weighted_direction_bias") @db.Decimal(20, 18)
+  consensusStrength               Decimal  @map("consensus_strength") @db.Decimal(20, 18)
+  maxConvictionShare              Decimal  @map("max_conviction_share") @db.Decimal(20, 18)
+  participantCount                Int      @map("participant_count")
+  capturedAt                      DateTime @map("captured_at")
+
+  @@index([coin, capturedAt])
+  @@map("consensus_snapshots")
+}
+
 /// provider 排行提供的帳戶級彙總（看不到逐筆部位時的 fallback 輸入）。僅有報酬序列的來源（如 OKX）會寫入。
 model TraderAccountStats {
   provider     Provider

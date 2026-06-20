@@ -36,3 +36,17 @@ export type RawFill = {
   hash: string;
   tid: number;
 };
+
+/** candleSnapshot 回傳的單根 K 線。`t`=開盤 ms、`c`=收盤價（字串）。 */
+export type RawCandle = {
+  t: number;
+  T: number;
+  s: string;
+  i: string;
+  o: string;
+  c: string;
+  h: string;
+  l: string;
+  v: string;
+  n: number;
+};

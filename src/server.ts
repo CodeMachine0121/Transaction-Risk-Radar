@@ -1,14 +1,17 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ListTradersApplication } from './application/listTradersApplication';
 import { RiskRankingApplication } from './application/riskRankingApplication';
+import { EntrySignalApplication } from './application/entrySignalApplication';
 import { SafeCohortConsensusApplication } from './application/safeCohortConsensusApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
+import { EntrySignalController } from './controller/entrySignalController';
 import { RiskRankingController } from './controller/riskRankingController';
 import { SafeCohortConsensusController } from './controller/safeCohortConsensusController';
 import { TraderDetailController } from './controller/traderDetailController';
 import { TraderListController } from './controller/traderListController';
 import type { IPositionRepository } from './domain/interface/iPositionRepository';
 import type { ITraderRepository } from './domain/interface/iTraderRepository';
+import { EntrySignalService } from './domain/service/entrySignalService';
 import { RiskRankingService } from './domain/service/riskRankingService';
 import { SafeCohortConsensusService } from './domain/service/safeCohortConsensusService';
 import { TraderDetailService } from './domain/service/traderDetailService';
@@ -45,19 +48,26 @@ export function buildServer(
   const traderListController = new TraderListController(
     new ListTradersApplication(new TraderListService(traderRepository)),
   );
+  const safeCohortConsensusService = new SafeCohortConsensusService(
+    traderRepository,
+    positionRepository,
+    {
+      freshnessWindowMilliseconds:
+        options.consensusFreshnessWindowMilliseconds ??
+        DEFAULT_CONSENSUS_FRESHNESS_WINDOW_MILLISECONDS,
+    },
+  );
   const safeCohortConsensusController = new SafeCohortConsensusController(
-    new SafeCohortConsensusApplication(
-      new SafeCohortConsensusService(traderRepository, positionRepository, {
-        freshnessWindowMilliseconds:
-          options.consensusFreshnessWindowMilliseconds ??
-          DEFAULT_CONSENSUS_FRESHNESS_WINDOW_MILLISECONDS,
-      }),
-    ),
+    new SafeCohortConsensusApplication(safeCohortConsensusService),
+  );
+  const entrySignalController = new EntrySignalController(
+    new EntrySignalApplication(safeCohortConsensusService, new EntrySignalService()),
   );
   riskRankingController.register(server);
   traderListController.register(server);
   traderDetailController.register(server);
   safeCohortConsensusController.register(server);
+  entrySignalController.register(server);
 
   return server;
 }

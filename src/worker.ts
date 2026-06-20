@@ -1,12 +1,16 @@
 import { PollTraderApplication } from './application/pollTraderApplication';
 import { RecomputeTraderMetricsApplication } from './application/recomputeTraderMetricsApplication';
+import { SnapshotConsensusApplication } from './application/snapshotConsensusApplication';
 import { SyncLeaderboardApplication } from './application/syncLeaderboardApplication';
 import type { ITraderDataProxy } from './domain/interface/iTraderDataProxy';
 import { PollTraderService } from './domain/service/pollTraderService';
 import { RecomputeTraderMetricsService } from './domain/service/recomputeTraderMetricsService';
+import { SafeCohortConsensusService } from './domain/service/safeCohortConsensusService';
+import { SnapshotConsensusService } from './domain/service/snapshotConsensusService';
 import { SyncLeaderboardService } from './domain/service/syncLeaderboardService';
 import { HyperliquidProxy } from './infrastructure/hyperliquid/hyperliquidProxy';
 import { OkxProxy } from './infrastructure/okx/okxProxy';
+import { ConsensusSnapshotRepository } from './infrastructure/persistence/consensusSnapshotRepository';
 import { createPrismaClient } from './infrastructure/persistence/prismaClient';
 import { PositionRepository } from './infrastructure/persistence/positionRepository';
 import { TraderRepository } from './infrastructure/persistence/traderRepository';
@@ -63,6 +67,19 @@ const recomputeTraderMetricsApplication = new RecomputeTraderMetricsApplication(
   new RecomputeTraderMetricsService(positionRepository, traderRepository),
 );
 
+// recompute 後留存一輪共識時序（供 B2 離線回測）。
+const consensusSnapshotRepository = new ConsensusSnapshotRepository(prismaClient);
+const consensusFreshnessWindowMilliseconds =
+  2 * Number(process.env.POLL_INTERVAL_MS ?? `${30 * 1000}`);
+const snapshotConsensusApplication = new SnapshotConsensusApplication(
+  new SnapshotConsensusService(
+    new SafeCohortConsensusService(traderRepository, positionRepository, {
+      freshnessWindowMilliseconds: consensusFreshnessWindowMilliseconds,
+    }),
+    consensusSnapshotRepository,
+  ),
+);
+
 const redisUrl = new URL(process.env.REDIS_URL ?? 'redis://localhost:6379');
 const connection = {
   host: redisUrl.hostname,
@@ -76,6 +93,7 @@ const scheduler = new Scheduler(
     providers: [buildPipeline(hyperliquidProxy), buildPipeline(okxProxy)],
     recomputeTraderMetricsApplication,
     traderRepository,
+    snapshotConsensusApplication,
   },
   {
     connection,
