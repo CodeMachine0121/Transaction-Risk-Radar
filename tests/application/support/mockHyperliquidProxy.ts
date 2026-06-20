@@ -5,9 +5,11 @@ import type { OpenPosition } from '@/domain/vo/openPosition';
 import { Provider } from '@/domain/vo/provider';
 import type { TraderActivity } from '@/domain/vo/traderActivity';
 
-/** 以 vi.fn 建立 ITraderDataProxy 的 mock（預設皆回空陣列）。 */
-export const createMockHyperliquidProxy = (): ITraderDataProxy => ({
-  provider: Provider.Hyperliquid,
+/** 以 vi.fn 建立 ITraderDataProxy 的 mock（預設皆回空陣列）；可指定 provider。 */
+export const createMockHyperliquidProxy = (
+  provider: Provider = Provider.Hyperliquid,
+): ITraderDataProxy => ({
+  provider,
   fetchTraderList: vi.fn<() => Promise<LeaderboardTrader[]>>().mockResolvedValue([]),
   fetchOpenPositions: vi
     .fn<(traderAddress: string) => Promise<OpenPosition[]>>()

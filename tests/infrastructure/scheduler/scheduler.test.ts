@@ -23,14 +23,19 @@ const buildScheduler = (deps: {
 }): Scheduler =>
   new Scheduler(
     {
-      syncLeaderboardApplication: new SyncLeaderboardApplication(
-        new SyncLeaderboardService(deps.hyperliquidProxy, deps.traderRepository),
-      ),
-      pollTraderApplication: new PollTraderApplication(
-        new PollTraderService(deps.hyperliquidProxy, deps.positionRepository, {
-          lookbackMilliseconds: 1000,
-        }),
-      ),
+      providers: [
+        {
+          provider: deps.hyperliquidProxy.provider,
+          syncLeaderboardApplication: new SyncLeaderboardApplication(
+            new SyncLeaderboardService(deps.hyperliquidProxy, deps.traderRepository),
+          ),
+          pollTraderApplication: new PollTraderApplication(
+            new PollTraderService(deps.hyperliquidProxy, deps.positionRepository, {
+              lookbackMilliseconds: 1000,
+            }),
+          ),
+        },
+      ],
       recomputeTraderMetricsApplication: new RecomputeTraderMetricsApplication(
         new RecomputeTraderMetricsService(deps.positionRepository, deps.traderRepository),
       ),
@@ -143,5 +148,55 @@ describe('Scheduler per-trader isolation', () => {
     expect(hyperliquidProxy.fetchPositionActivities).toHaveBeenCalledTimes(3); // A, B, C all attempted
     expect(onTraderError).toHaveBeenCalledTimes(1);
     expect(onTraderError).toHaveBeenCalledWith('poll', 'B', expect.any(Error));
+  });
+
+  it('isolates a failing provider so others still run (cross-provider parallel)', async () => {
+    const traderRepository = createMockTraderRepository();
+    vi.mocked(traderRepository.findAllTraderKeys).mockResolvedValue([
+      { provider: Provider.Hyperliquid, address: 'H1' },
+      { provider: Provider.Okx, address: 'O1' },
+    ]);
+    const positionRepository = createMockPositionRepository();
+    // Hyperliquid 的 sync 失敗 → 該 provider 本輪 poll 應被跳過。
+    const hyperliquidProxy = createMockHyperliquidProxy(Provider.Hyperliquid);
+    vi.mocked(hyperliquidProxy.fetchTraderList).mockRejectedValue(new Error('hl down'));
+    // OKX 的 sync 正常 → 應照常 poll 其交易員。
+    const okxProxy = createMockHyperliquidProxy(Provider.Okx);
+
+    const pipeline = (proxy: ITraderDataProxy): {
+      provider: Provider;
+      syncLeaderboardApplication: SyncLeaderboardApplication;
+      pollTraderApplication: PollTraderApplication;
+    } => ({
+      provider: proxy.provider,
+      syncLeaderboardApplication: new SyncLeaderboardApplication(
+        new SyncLeaderboardService(proxy, traderRepository),
+      ),
+      pollTraderApplication: new PollTraderApplication(
+        new PollTraderService(proxy, positionRepository, { lookbackMilliseconds: 1000 }),
+      ),
+    });
+
+    const scheduler = new Scheduler(
+      {
+        providers: [pipeline(hyperliquidProxy), pipeline(okxProxy)],
+        recomputeTraderMetricsApplication: new RecomputeTraderMetricsApplication(
+          new RecomputeTraderMetricsService(positionRepository, traderRepository),
+        ),
+        traderRepository,
+      },
+      {
+        connection: { host: '127.0.0.1', port: 6379 },
+        syncIntervalMs: 1000,
+        pollIntervalMs: 1000,
+        recomputeIntervalMs: 1000,
+        onTraderError: vi.fn(),
+      },
+    );
+
+    await scheduler.runInitialCycle();
+
+    expect(hyperliquidProxy.fetchPositionActivities).not.toHaveBeenCalled(); // HL sync 失敗 → 跳過
+    expect(okxProxy.fetchPositionActivities).toHaveBeenCalledWith('O1', expect.any(Number)); // OKX 照常
   });
 });
