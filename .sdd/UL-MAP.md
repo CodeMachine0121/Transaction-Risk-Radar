@@ -42,6 +42,9 @@ _Records entities, value objects, attributes and their correspondence between co
 | 權重預算 Weight Budget         | `requestWeightBudget`                 | —                           | per-IP 每分鐘可用的 aggregate weight 上限（約 1200，動工前對官方 docs 校準）。token bucket 以此速率回填。                                       | Confirmed                      |
 | 交易員輪詢分層 Polling Tier    | `traderPollingTier`                   | —                           | 依 leaderboard `accountValue` 將交易員分層，決定輪詢頻率（高排名勤、長尾鬆）。                                                                  | Confirmed                      |
 | 最後成交時間 Latest Fill Time  | `latestObservedFillTimestamp`         | —                           | 每位交易員已落庫成交的最新 `occurredAt`，作 high-watermark 增量抓取的 `startTime`。由 `PositionFill.max(occurredAt)` 推導，不另存欄位。         | Confirmed                      |
+| 資料來源 Provider              | `provider`（**enum**）                | —                           | 交易資料的來源場所，以 **enum** 表示（`hyperliquid` / `okx`…）。為 `Trader` entity 的一個欄位；與 address 共同構成唯一識別 `(provider, address)`（EVM 場所共用 0x 會撞號）。 | Confirmed                      |
+| 帶單員 Lead Trader             | `leadTrader`（`uniqueCode`）          | Lead Trader                 | OKX copy-trading 上可被跟單的交易員，以 `uniqueCode` 識別（在 `(provider, address)` 模型中放入 address 欄位）。                                     | Confirmed                      |
+| 子倉位 Sub-position            | `subPosition`（`subPosId`）           | —                           | OKX copy-trading 中帶單員「**每張開倉單**」對應的一筆倉位記錄（含 `openAvgPx`/`openTime`/`openOrdId`）。分批加倉＝多筆 sub-position，可重建加倉路徑（攤平偵測依據）。 | Confirmed                      |
 
 ---
 
@@ -64,6 +67,8 @@ _Records business operations, function logic, and their corresponding business a
 | 依權重限流 Throttle by Weight   | `throttleByRequestWeight`                   | 每次 `/info` 請求前          | 依請求 weight 取 token；額度不足時 block-and-wait 等回填，結構性壓在預算內     | token bucket，行程內（單一 worker/IP） |
 | 限流退避重試 Backoff on 429     | `retryWithBackoffOnTooManyRequests`         | 收到 HTTP 429                | 讀 `Retry-After`，exponential backoff + jitter 重試（含上限），取代直接 throw | 限 `/info`；leaderboard 亦適用退避但不計 weight |
 | 增量輪詢成交 Poll Fills Incrementally | `pollTraderFillsSinceLatest`          | 分層排程                     | 以 `latestObservedFillTimestamp` 作 `startTime` 增量抓 fills，不再每輪重抓 90 天 | 無歷史成交者退回首次 lookback     |
+| 攝取交易員資料（多源） Ingest Trader Data | `ingestTraderData`                  | per-provider 排程               | 由各 provider 的 proxy 取得名單/成交/部位，正規化成共用 domain VO（HL 走 fills、OKX 走 sub-positions） | 每個 provider 一條 sync→poll→recompute |
+| 由子倉位重建倉位 Reconstruct from Sub-positions | `reconstructPositionsFromSubPositions` | OKX recompute             | 把同標的的多筆 sub-position 依 `openTime` 排序為加倉序列，重建邏輯倉位（供攤平/勝率/報酬率） | 對應 HL 的 `reconstructPositions`（fills） |
 
 ---
 
@@ -96,6 +101,8 @@ _Records magic numbers/strings in code and their real business meaning._
 | Position Side       | `short`          | 空單         | 做空方向                                         |
 | Risk Ranking Sort   | `ascending`      | 安全在前     | 預設：riskScore 由低到高，找相對安全可跟的交易員 |
 | Risk Ranking Sort   | `descending`     | 高危在前     | 黑名單模式：riskScore 由高到低                   |
+| Provider            | `hyperliquid`    | Hyperliquid  | 鏈上永續 DEX，逐筆 fills 來源                    |
+| Provider            | `okx`            | OKX          | CEX copy-trading，per-order sub-position 來源    |
 
 ---
 
