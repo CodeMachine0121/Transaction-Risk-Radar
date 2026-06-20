@@ -5,13 +5,14 @@ import type { Trader } from '../entity/trader';
 import type { IPositionRepository } from '../interface/iPositionRepository';
 import type { ITraderRepository } from '../interface/iTraderRepository';
 import type { Provider } from '../vo/provider';
-import type { SafeCohortConsensusQuery } from '../vo/safeCohortConsensusQuery';
+import type { SafeCohortConsensusQuery, Weighting } from '../vo/safeCohortConsensusQuery';
 
 const ZERO = new Decimal(0);
 const ONE = new Decimal(1);
 const DEFAULT_MAX_RISK_SCORE = new Decimal(40);
 const DEFAULT_MINIMUM_CONSENSUS_PARTICIPANTS = 3;
 const DEFAULT_LIMIT = 50;
+const DEFAULT_WEIGHTING: Weighting = 'conviction';
 const DISCLAIMER =
   '本資料為「安全群」當前持倉的描述性共識，非投資建議、亦非價格預測。鏈上永續為負和遊戲，方向一致不代表會獲利，請勿據此重壓。';
 
@@ -120,7 +121,8 @@ export class SafeCohortConsensusService {
     for (const contribution of perProvider.flat()) {
       this.applyContribution(accumulators, contribution);
     }
-    return [...accumulators].map(([coin, accumulator]) => this.toDto(coin, accumulator));
+    const weighting = query.weighting ?? DEFAULT_WEIGHTING;
+    return [...accumulators].map(([coin, accumulator]) => this.toDto(coin, accumulator, weighting));
   }
 
   /** 取某 provider 安全群的當前持倉，join 回權重 + 計算 conviction 佔比後產出投票清單。 */
@@ -192,7 +194,7 @@ export class SafeCohortConsensusService {
     });
   }
 
-  private toDto(coin: string, accumulator: CoinAccumulator): CoinConsensusDto {
+  private toDto(coin: string, accumulator: CoinAccumulator, weighting: Weighting): CoinConsensusDto {
     const participantCount = accumulator.longCount + accumulator.shortCount;
     const count = new Decimal(participantCount);
     const netDirectionBias = accumulator.totalRiskWeight.isZero()
@@ -201,11 +203,13 @@ export class SafeCohortConsensusService {
     const convictionWeightedDirectionBias = accumulator.totalConvictionWeight.isZero()
       ? ZERO
       : accumulator.signedConvictionWeight.dividedBy(accumulator.totalConvictionWeight);
+    const selectedBias =
+      weighting === 'equal' ? netDirectionBias : convictionWeightedDirectionBias;
     return {
       coin,
       netDirectionBias: netDirectionBias.toString(),
       convictionWeightedDirectionBias: convictionWeightedDirectionBias.toString(),
-      consensusStrength: netDirectionBias.abs().toString(),
+      consensusStrength: selectedBias.abs().toString(),
       participantCount,
       longCount: accumulator.longCount,
       shortCount: accumulator.shortCount,

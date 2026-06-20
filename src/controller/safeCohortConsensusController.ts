@@ -6,6 +6,7 @@ import { parseProvider } from './parseProvider';
 
 type SafeCohortConsensusRequest = {
   provider?: string;
+  weighting?: string;
   maxRiskScore?: string;
   minParticipants?: string;
   offset?: string;
@@ -24,6 +25,12 @@ const parseConsensusRequest = (raw: SafeCohortConsensusRequest): ParseResult => 
   const provider = parseProvider(raw.provider);
   if (provider !== undefined) {
     query.provider = provider;
+  }
+  if (raw.weighting !== undefined) {
+    if (raw.weighting !== 'equal' && raw.weighting !== 'conviction') {
+      return { error: "weighting must be 'equal' or 'conviction'" };
+    }
+    query.weighting = raw.weighting;
   }
   if (raw.maxRiskScore !== undefined) {
     const value = Number(raw.maxRiskScore);

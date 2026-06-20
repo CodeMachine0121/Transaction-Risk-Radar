@@ -196,4 +196,12 @@ describe('HTTP API', () => {
 
     expect(response.statusCode).toBe(400);
   });
+
+  it('GET /consensus rejects an unknown weighting with 400', async () => {
+    server = buildServer(createMockTraderRepository(), createMockPositionRepository());
+
+    const response = await server.inject({ method: 'GET', url: '/consensus?weighting=bogus' });
+
+    expect(response.statusCode).toBe(400);
+  });
 });
