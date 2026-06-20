@@ -8,7 +8,11 @@ import { Position } from '../../domain/entity/position';
 import type { IPositionRepository } from '../../domain/interface/iPositionRepository';
 import type { PositionSnapshot } from '../../domain/vo/positionSnapshot';
 import type { PositionSnapshotRecord } from '../../domain/vo/positionSnapshotRecord';
+import { Provider } from '../../domain/vo/provider';
 import type { TraderActivity } from '../../domain/vo/traderActivity';
+
+const toPrismaProvider = (value: Provider): 'hyperliquid' | 'okx' =>
+  value === Provider.Okx ? 'okx' : 'hyperliquid';
 
 const toTraderActivity = (row: PositionActivityRow): TraderActivity => ({
   coin: row.coin,
@@ -31,12 +35,17 @@ export class PositionRepository implements IPositionRepository {
     this.prismaClient = prismaClient;
   }
 
-  async saveActivities(traderAddress: string, activities: TraderActivity[]): Promise<void> {
+  async saveActivities(
+    provider: Provider,
+    traderAddress: string,
+    activities: TraderActivity[],
+  ): Promise<void> {
     if (activities.length === 0) {
       return;
     }
     await this.prismaClient.positionActivity.createMany({
       data: activities.map((activity) => ({
+        provider: toPrismaProvider(provider),
         sourceReference: activity.sourceReference,
         traderAddress,
         coin: activity.coin,
@@ -46,17 +55,22 @@ export class PositionRepository implements IPositionRepository {
         realizedProfitAndLoss: activity.realizedProfitAndLoss.toString(),
         occurredAt: new Date(activity.occurredAt),
       })),
-      skipDuplicates: true, // 以 sourceReference (PK) 去重
+      skipDuplicates: true, // 以 (provider, sourceReference) (PK) 去重
     });
   }
 
-  async saveSnapshots(traderAddress: string, snapshots: PositionSnapshotRecord[]): Promise<void> {
+  async saveSnapshots(
+    provider: Provider,
+    traderAddress: string,
+    snapshots: PositionSnapshotRecord[],
+  ): Promise<void> {
     if (snapshots.length === 0) {
       return;
     }
     const capturedAt = new Date();
     await this.prismaClient.positionSnapshot.createMany({
       data: snapshots.map((snapshot) => ({
+        provider: toPrismaProvider(provider),
         traderAddress,
         coin: snapshot.coin,
         markPrice: snapshot.markPrice.toString(),
@@ -68,23 +82,23 @@ export class PositionRepository implements IPositionRepository {
     });
   }
 
-  async latestActivityTimestamp(traderAddress: string): Promise<number | null> {
+  async latestActivityTimestamp(provider: Provider, traderAddress: string): Promise<number | null> {
     const result = await this.prismaClient.positionActivity.aggregate({
-      where: { traderAddress },
+      where: { provider: toPrismaProvider(provider), traderAddress },
       _max: { occurredAt: true },
     });
     return result._max.occurredAt?.getTime() ?? null;
   }
 
-  async findPositions(traderAddress: string): Promise<Position[]> {
+  async findPositions(provider: Provider, traderAddress: string): Promise<Position[]> {
     const activityRows = await this.prismaClient.positionActivity.findMany({
-      where: { traderAddress },
+      where: { provider: toPrismaProvider(provider), traderAddress },
       orderBy: { occurredAt: 'asc' },
     });
     const positions = Position.reconstruct(activityRows.map(toTraderActivity));
 
     const snapshotRows = await this.prismaClient.positionSnapshot.findMany({
-      where: { traderAddress },
+      where: { provider: toPrismaProvider(provider), traderAddress },
       orderBy: { capturedAt: 'asc' },
     });
     return positions.map((position) =>

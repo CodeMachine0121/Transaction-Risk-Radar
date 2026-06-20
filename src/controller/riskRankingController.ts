@@ -2,8 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import type { RiskRankingApplication } from '../application/riskRankingApplication';
 import type { TraderRiskDto } from '../domain/dto/traderRiskDto';
 import type { RiskRankingQuery } from '../domain/vo/riskRankingQuery';
+import { parseProvider } from './parseProvider';
 
 type RiskRankingRequest = {
+  provider?: string;
   direction?: string;
   offset?: string;
   limit?: string;
@@ -19,6 +21,10 @@ const parseOptionalInteger = (raw: string | undefined): number | undefined => {
 
 const parseRankingQuery = (raw: RiskRankingRequest): RiskRankingQuery => {
   const query: RiskRankingQuery = {};
+  const provider = parseProvider(raw.provider);
+  if (provider !== undefined) {
+    query.provider = provider;
+  }
   if (raw.direction === 'ascending' || raw.direction === 'descending') {
     query.direction = raw.direction;
   }

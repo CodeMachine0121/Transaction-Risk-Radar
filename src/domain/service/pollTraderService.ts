@@ -37,13 +37,15 @@ export class PollTraderService {
   }
 
   async poll(traderAddress: string): Promise<void> {
-    const latest = await this.positionRepository.latestActivityTimestamp(traderAddress);
+    const provider = this.hyperliquidProxy.provider;
+    const latest = await this.positionRepository.latestActivityTimestamp(provider, traderAddress);
     const startTime = latest ?? this.now() - this.lookbackMilliseconds;
     const activities = await this.hyperliquidProxy.fetchPositionActivities(traderAddress, startTime);
-    await this.positionRepository.saveActivities(traderAddress, activities);
+    await this.positionRepository.saveActivities(provider, traderAddress, activities);
 
     const openPositions = await this.hyperliquidProxy.fetchOpenPositions(traderAddress);
     await this.positionRepository.saveSnapshots(
+      provider,
       traderAddress,
       openPositions.map((position) => this.toSnapshotRecord(position)),
     );

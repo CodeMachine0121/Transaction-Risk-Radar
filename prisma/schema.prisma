@@ -15,20 +15,29 @@ datasource db {
   provider = "postgresql"
 }
 
-/// 被追蹤分析的鏈上交易員（錢包地址），來源為 Hyperliquid leaderboard。
+/// 資料來源場所。與 address 共同構成交易員唯一識別 `(provider, address)`。
+enum Provider {
+  hyperliquid
+  okx
+}
+
+/// 被追蹤分析的交易員，以 `(provider, address)` 唯一識別。
 model Trader {
-  address     String   @id
+  provider    Provider
+  address     String
   firstSeenAt DateTime @default(now()) @map("first_seen_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   metrics TraderMetrics?
 
+  @@id([provider, address])
   @@map("traders")
 }
 
-/// 一筆 provider-agnostic 的倉位變動腿。以 sourceReference 去重 (idempotency)；倉位由此重建。
+/// 一筆 provider-agnostic 的倉位變動腿。以 `(provider, sourceReference)` 去重；倉位由此重建。
 model PositionActivity {
-  sourceReference       String   @id @map("source_reference")
+  provider              Provider
+  sourceReference       String   @map("source_reference")
   traderAddress         String   @map("trader_address")
   coin                  String
   price                 Decimal  @db.Decimal(38, 18)
@@ -37,13 +46,15 @@ model PositionActivity {
   realizedProfitAndLoss Decimal  @map("realized_profit_and_loss") @db.Decimal(38, 18)
   occurredAt            DateTime @map("occurred_at")
 
-  @@index([traderAddress, coin, occurredAt])
+  @@id([provider, sourceReference])
+  @@index([provider, traderAddress, coin, occurredAt])
   @@map("position_activities")
 }
 
-/// 每次輪詢對開倉拍下的時間切片，依 trader+coin+time 記錄；讀取時依時間窗掛回對應倉位。
+/// 每次輪詢對開倉拍下的時間切片，依 provider+trader+coin+time 記錄；讀取時依時間窗掛回對應倉位。
 model PositionSnapshot {
   id                                String   @id @default(uuid())
+  provider                          Provider
   traderAddress                     String   @map("trader_address")
   coin                              String
   markPrice                         Decimal  @map("mark_price") @db.Decimal(38, 18)
@@ -52,13 +63,14 @@ model PositionSnapshot {
   leverage                          Decimal  @db.Decimal(18, 4)
   capturedAt                        DateTime @map("captured_at")
 
-  @@index([traderAddress, coin, capturedAt])
+  @@index([provider, traderAddress, coin, capturedAt])
   @@map("position_snapshots")
 }
 
 /// 交易員經分析引擎計算後的彙總指標集（見 PRD 第 4 章公式）。
 model TraderMetrics {
-  traderAddress                   String   @id @map("trader_address")
+  provider                        Provider
+  traderAddress                   String   @map("trader_address")
   maxAdverseExcursionPercentile90 Decimal? @map("max_adverse_excursion_percentile_90") @db.Decimal(18, 8)
   averagingDownRatio              Decimal? @map("averaging_down_ratio") @db.Decimal(9, 8)
   winRate                         Decimal? @map("win_rate") @db.Decimal(9, 8)
@@ -71,7 +83,8 @@ model TraderMetrics {
   insufficientData                Boolean  @default(true) @map("insufficient_data")
   computedAt                      DateTime @updatedAt @map("computed_at")
 
-  trader Trader @relation(fields: [traderAddress], references: [address])
+  trader Trader @relation(fields: [provider, traderAddress], references: [provider, address])
 
+  @@id([provider, traderAddress])
   @@map("trader_metrics")
 }

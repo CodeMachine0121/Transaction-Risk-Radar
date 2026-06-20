@@ -8,6 +8,7 @@ import { SyncLeaderboardService } from '@/domain/service/syncLeaderboardService'
 import type { ITraderDataProxy } from '@/domain/interface/iTraderDataProxy';
 import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
 import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
+import { Provider } from '@/domain/vo/provider';
 import { Scheduler } from '@/infrastructure/scheduler/scheduler';
 import { createMockHyperliquidProxy } from '../../application/support/mockHyperliquidProxy';
 import { createMockPositionRepository } from '../../application/support/mockPositionRepository';
@@ -47,9 +48,13 @@ const buildScheduler = (deps: {
 describe('Scheduler per-trader isolation', () => {
   it('recomputes every trader even when one fails, reporting the failure', async () => {
     const traderRepository = createMockTraderRepository();
-    vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A', 'B', 'C']);
+    vi.mocked(traderRepository.findAllTraderKeys).mockResolvedValue([
+      { provider: Provider.Hyperliquid, address: 'A' },
+      { provider: Provider.Hyperliquid, address: 'B' },
+      { provider: Provider.Hyperliquid, address: 'C' },
+    ]);
     const positionRepository = createMockPositionRepository();
-    vi.mocked(positionRepository.findPositions).mockImplementation((traderAddress) =>
+    vi.mocked(positionRepository.findPositions).mockImplementation((_provider, traderAddress) =>
       traderAddress === 'B' ? Promise.reject(new Error('db down')) : Promise.resolve([]),
     );
     const onTraderError = vi.fn();
@@ -70,7 +75,7 @@ describe('Scheduler per-trader isolation', () => {
 
   it('runs sync then poll then recompute once on the initial cycle', async () => {
     const traderRepository = createMockTraderRepository();
-    vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A']);
+    vi.mocked(traderRepository.findAllTraderKeys).mockResolvedValue([{ provider: Provider.Hyperliquid, address: 'A' }]);
     const hyperliquidProxy = createMockHyperliquidProxy();
     const callOrder: string[] = [];
     vi.mocked(traderRepository.saveTraders).mockImplementation(async () => {
@@ -99,7 +104,7 @@ describe('Scheduler per-trader isolation', () => {
 
   it('skips poll and recompute when the initial sync fails', async () => {
     const traderRepository = createMockTraderRepository();
-    vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A']);
+    vi.mocked(traderRepository.findAllTraderKeys).mockResolvedValue([{ provider: Provider.Hyperliquid, address: 'A' }]);
     const hyperliquidProxy = createMockHyperliquidProxy();
     vi.mocked(hyperliquidProxy.fetchTraderList).mockRejectedValue(new Error('rate limited'));
     const scheduler = buildScheduler({
@@ -116,7 +121,11 @@ describe('Scheduler per-trader isolation', () => {
 
   it('polls every trader even when one fails, reporting the failure', async () => {
     const traderRepository = createMockTraderRepository();
-    vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A', 'B', 'C']);
+    vi.mocked(traderRepository.findAllTraderKeys).mockResolvedValue([
+      { provider: Provider.Hyperliquid, address: 'A' },
+      { provider: Provider.Hyperliquid, address: 'B' },
+      { provider: Provider.Hyperliquid, address: 'C' },
+    ]);
     const hyperliquidProxy = createMockHyperliquidProxy();
     vi.mocked(hyperliquidProxy.fetchPositionActivities).mockImplementation((traderAddress) =>
       traderAddress === 'B' ? Promise.reject(new Error('rate limited')) : Promise.resolve([]),

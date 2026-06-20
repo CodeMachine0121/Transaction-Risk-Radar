@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
 import { SyncLeaderboardApplication } from '@/application/syncLeaderboardApplication';
 import { SyncLeaderboardService } from '@/domain/service/syncLeaderboardService';
+import { Provider } from '@/domain/vo/provider';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 import { createMockTraderRepository } from './support/mockTraderRepository';
 
@@ -22,7 +23,7 @@ describe('SyncLeaderboardApplication', () => {
     const count = await application.sync();
 
     expect(count).toBe(2);
-    expect(traderRepository.saveTraders).toHaveBeenCalledWith(['0xA', '0xB']);
+    expect(traderRepository.saveTraders).toHaveBeenCalledWith(Provider.Hyperliquid, ['0xA', '0xB']);
   });
 
   it('caps the synced traders to the configured maximum', async () => {
@@ -40,6 +41,6 @@ describe('SyncLeaderboardApplication', () => {
     const count = await application.sync();
 
     expect(count).toBe(2);
-    expect(traderRepository.saveTraders).toHaveBeenCalledWith(['0xA', '0xB']);
+    expect(traderRepository.saveTraders).toHaveBeenCalledWith(Provider.Hyperliquid, ['0xA', '0xB']);
   });
 });

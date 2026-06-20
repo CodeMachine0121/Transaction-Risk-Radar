@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 import { Trader } from '@/domain/entity/trader';
 import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 import { Provider } from '@/domain/vo/provider';
+import type { TraderKey } from '@/domain/vo/traderKey';
 
 /** 測試資料工廠：以 stored metrics hydrate 出一個 Trader（給定 riskScore）。 */
 export const buildTrader = (
@@ -24,11 +25,13 @@ export const buildTrader = (
   });
 
 export const createMockTraderRepository = (): ITraderRepository => ({
-  saveTraders: vi.fn<(traderAddresses: string[]) => Promise<void>>().mockResolvedValue(undefined),
-  findAllAddresses: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
-  findRankableTraders: vi.fn<() => Promise<Trader[]>>().mockResolvedValue([]),
-  findTraderByAddress: vi
-    .fn<(traderAddress: string) => Promise<Trader | null>>()
+  saveTraders: vi
+    .fn<(provider: Provider, traderAddresses: string[]) => Promise<void>>()
+    .mockResolvedValue(undefined),
+  findAllTraderKeys: vi.fn<() => Promise<TraderKey[]>>().mockResolvedValue([]),
+  findRankableTraders: vi.fn<(provider?: Provider) => Promise<Trader[]>>().mockResolvedValue([]),
+  findTrader: vi
+    .fn<(provider: Provider, traderAddress: string) => Promise<Trader | null>>()
     .mockResolvedValue(null),
   saveTraderMetrics: vi.fn<(trader: Trader) => Promise<void>>().mockResolvedValue(undefined),
 });

@@ -86,14 +86,14 @@ export class Scheduler {
 
   /** 輪詢每位 trader（startTime 由 PollTraderService 以 high-watermark 解析）；單一失敗只回報不中斷整批。 */
   async pollAllTraders(): Promise<void> {
-    const addresses = await this.applications.traderRepository.findAllAddresses();
-    for (const address of addresses) {
+    const keys = await this.applications.traderRepository.findAllTraderKeys();
+    for (const key of keys) {
       try {
-        await this.applications.pollTraderApplication.poll(address);
+        await this.applications.pollTraderApplication.poll(key.address);
       } catch (caught) {
         this.reportTraderError(
           'poll',
-          address,
+          key.address,
           caught instanceof Error ? caught : new Error(String(caught)),
         );
       }
@@ -102,14 +102,14 @@ export class Scheduler {
 
   /** 重算每位 trader 的指標；單一失敗只回報不中斷整批。 */
   async recomputeAllTraders(): Promise<void> {
-    const addresses = await this.applications.traderRepository.findAllAddresses();
-    for (const address of addresses) {
+    const keys = await this.applications.traderRepository.findAllTraderKeys();
+    for (const key of keys) {
       try {
-        await this.applications.recomputeTraderMetricsApplication.recompute(address);
+        await this.applications.recomputeTraderMetricsApplication.recompute(key.provider, key.address);
       } catch (caught) {
         this.reportTraderError(
           'recompute',
-          address,
+          key.address,
           caught instanceof Error ? caught : new Error(String(caught)),
         );
       }

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { RecomputeTraderMetricsApplication } from '@/application/recomputeTraderMetricsApplication';
 import { Position } from '@/domain/entity/position';
 import { RecomputeTraderMetricsService } from '@/domain/service/recomputeTraderMetricsService';
+import { Provider } from '@/domain/vo/provider';
 import { createMockPositionRepository } from './support/mockPositionRepository';
 import { createMockTraderRepository } from './support/mockTraderRepository';
 
@@ -28,9 +29,9 @@ describe('RecomputeTraderMetricsApplication', () => {
       new RecomputeTraderMetricsService(positionRepository, traderRepository),
     );
 
-    const dto = await application.recompute('0xA');
+    const dto = await application.recompute(Provider.Hyperliquid, '0xA');
 
-    expect(positionRepository.findPositions).toHaveBeenCalledWith('0xA');
+    expect(positionRepository.findPositions).toHaveBeenCalledWith(Provider.Hyperliquid, '0xA');
     expect(traderRepository.saveTraderMetrics).toHaveBeenCalledOnce();
     expect(dto.insufficientData).toBe(true); // 1 closed < minimum 20
     expect(dto.closedPositionCount).toBe(1);
@@ -46,7 +47,7 @@ describe('RecomputeTraderMetricsApplication', () => {
       new RecomputeTraderMetricsService(positionRepository, createMockTraderRepository()),
     );
 
-    const dto = await application.recompute('0xA');
+    const dto = await application.recompute(Provider.Hyperliquid, '0xA');
 
     expect(dto.closedPositionCount).toBe(1);
   });

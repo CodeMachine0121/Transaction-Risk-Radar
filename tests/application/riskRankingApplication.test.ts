@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RiskRankingApplication } from '@/application/riskRankingApplication';
 import { RiskRankingService } from '@/domain/service/riskRankingService';
+import { Provider } from '@/domain/vo/provider';
 import { buildTrader, createMockTraderRepository } from './support/mockTraderRepository';
 
 // 測 application 時注入「真實的 domain service + entity」，只 mock repository 介面。
@@ -31,5 +32,15 @@ describe('RiskRankingApplication', () => {
     const ranking = await application.listRanking({ direction: 'descending' });
 
     expect(ranking.map((dto) => dto.traderAddress)).toEqual(['A', 'B']);
+  });
+
+  it('filters the ranking by provider when given', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findRankableTraders).mockResolvedValue([buildTrader('A', 70)]);
+    const application = new RiskRankingApplication(new RiskRankingService(repository));
+
+    await application.listRanking({ provider: Provider.Okx });
+
+    expect(repository.findRankableTraders).toHaveBeenCalledWith(Provider.Okx);
   });
 });

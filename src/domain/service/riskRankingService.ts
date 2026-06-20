@@ -19,7 +19,7 @@ export class RiskRankingService {
     const offset = query.offset ?? 0;
     const limit = query.limit ?? DEFAULT_LIMIT;
 
-    const traders = await this.traderRepository.findRankableTraders();
+    const traders = await this.traderRepository.findRankableTraders(query.provider);
     const scored = traders
       .map((trader) => ({ trader, score: trader.riskScore() }))
       .filter(

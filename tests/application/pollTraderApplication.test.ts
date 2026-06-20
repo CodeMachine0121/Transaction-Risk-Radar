@@ -5,6 +5,7 @@ import { PollTraderService } from '@/domain/service/pollTraderService';
 import type { ITraderDataProxy } from '@/domain/interface/iTraderDataProxy';
 import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
 import type { OpenPosition } from '@/domain/vo/openPosition';
+import { Provider } from '@/domain/vo/provider';
 import type { TraderActivity } from '@/domain/vo/traderActivity';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 import { createMockPositionRepository } from './support/mockPositionRepository';
@@ -49,7 +50,9 @@ describe('PollTraderApplication', () => {
     await application.poll('0xA');
 
     expect(proxy.fetchPositionActivities).toHaveBeenCalledWith('0xA', 5000);
-    expect(positionRepository.saveActivities).toHaveBeenCalledWith('0xA', [fill()]);
+    expect(positionRepository.saveActivities).toHaveBeenCalledWith(Provider.Hyperliquid, '0xA', [
+      fill(),
+    ]);
   });
 
   it('falls back to now minus lookback when there is no prior fill', async () => {
@@ -76,7 +79,7 @@ describe('PollTraderApplication', () => {
 
     await application.poll('0xA');
 
-    const [, snapshots] = vi.mocked(positionRepository.saveSnapshots).mock.calls[0] ?? [];
+    const [, , snapshots] = vi.mocked(positionRepository.saveSnapshots).mock.calls[0] ?? [];
     expect(snapshots?.[0]?.coin).toBe('ETH');
     expect(snapshots?.[0]?.unrealizedProfitAndLossPercentage.toString()).toBe('20');
     expect(snapshots?.[0]?.markPrice.toString()).toBe('120');

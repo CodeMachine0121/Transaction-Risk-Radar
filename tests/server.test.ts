@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '@/server';
 import type { TraderRiskDto } from '@/domain/dto/traderRiskDto';
+import { Provider } from '@/domain/vo/provider';
 import {
   buildTrader,
   createMockTraderRepository,
@@ -49,7 +50,7 @@ describe('HTTP API', () => {
 
   it('GET /traders/:address returns the trader detail', async () => {
     const repository = createMockTraderRepository();
-    vi.mocked(repository.findTraderByAddress).mockResolvedValue(buildTrader('A', 70));
+    vi.mocked(repository.findTrader).mockResolvedValue(buildTrader('A', 70));
     server = buildServer(repository);
 
     const response = await server.inject({ method: 'GET', url: '/traders/A' });
@@ -60,11 +61,23 @@ describe('HTTP API', () => {
 
   it('GET /traders/:address returns 404 when the trader is unknown', async () => {
     const repository = createMockTraderRepository();
-    vi.mocked(repository.findTraderByAddress).mockResolvedValue(null);
+    vi.mocked(repository.findTrader).mockResolvedValue(null);
     server = buildServer(repository);
 
     const response = await server.inject({ method: 'GET', url: '/traders/Z' });
 
     expect(response.statusCode).toBe(404);
+  });
+
+  it('GET /traders/:address resolves by ?provider= (defaults hyperliquid)', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findTrader).mockResolvedValue(buildTrader('A', 70));
+    server = buildServer(repository);
+
+    await server.inject({ method: 'GET', url: '/traders/A?provider=okx' });
+    expect(repository.findTrader).toHaveBeenCalledWith(Provider.Okx, 'A');
+
+    await server.inject({ method: 'GET', url: '/traders/A' });
+    expect(repository.findTrader).toHaveBeenCalledWith(Provider.Hyperliquid, 'A');
   });
 });

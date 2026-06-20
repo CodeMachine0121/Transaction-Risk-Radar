@@ -1,5 +1,6 @@
 import type { TraderRiskDto } from '../domain/dto/traderRiskDto';
 import type { RecomputeTraderMetricsService } from '../domain/service/recomputeTraderMetricsService';
+import type { Provider } from '../domain/vo/provider';
 
 /** 用例（US-05）：委派 RecomputeTraderMetricsService 重算並持久化指標。 */
 export class RecomputeTraderMetricsApplication {
@@ -9,7 +10,7 @@ export class RecomputeTraderMetricsApplication {
     this.recomputeTraderMetricsService = recomputeTraderMetricsService;
   }
 
-  recompute(traderAddress: string): Promise<TraderRiskDto> {
-    return this.recomputeTraderMetricsService.recompute(traderAddress);
+  recompute(provider: Provider, traderAddress: string): Promise<TraderRiskDto> {
+    return this.recomputeTraderMetricsService.recompute(provider, traderAddress);
   }
 }

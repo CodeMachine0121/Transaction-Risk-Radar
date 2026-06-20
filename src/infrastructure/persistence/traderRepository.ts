@@ -1,9 +1,15 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient, TraderMetrics as TraderMetricsRow } from '@prisma/client';
 import { Trader } from '../../domain/entity/trader';
-import { Provider } from '../../domain/vo/provider';
 import type { ITraderRepository } from '../../domain/interface/iTraderRepository';
+import { Provider } from '../../domain/vo/provider';
+import type { TraderKey } from '../../domain/vo/traderKey';
 import type { TraderMetrics } from '../../domain/vo/traderMetrics';
+
+const toDomainProvider = (value: string): Provider =>
+  value === 'okx' ? Provider.Okx : Provider.Hyperliquid;
+const toPrismaProvider = (value: Provider): 'hyperliquid' | 'okx' =>
+  value === Provider.Okx ? 'okx' : 'hyperliquid';
 
 const toDomainDecimal = (value: { toString(): string } | null): Decimal | null =>
   value === null ? null : new Decimal(value.toString());
@@ -24,7 +30,7 @@ const toTrader = (row: TraderMetricsRow): Trader => {
     closedPositionCount: row.closedPositionCount,
     insufficientData: row.insufficientData,
   };
-  return Trader.fromStoredMetrics(Provider.Hyperliquid, row.traderAddress, metrics);
+  return Trader.fromStoredMetrics(toDomainProvider(row.provider), row.traderAddress, metrics);
 };
 
 /** Repository（Trader entity）：以 Prisma 管理追蹤名單與 trader_metrics 的讀寫。 */
@@ -35,35 +41,44 @@ export class TraderRepository implements ITraderRepository {
     this.prismaClient = prismaClient;
   }
 
-  async saveTraders(traderAddresses: string[]): Promise<void> {
+  async saveTraders(provider: Provider, traderAddresses: string[]): Promise<void> {
     if (traderAddresses.length === 0) {
       return;
     }
     await this.prismaClient.trader.createMany({
-      data: traderAddresses.map((address) => ({ address })),
+      data: traderAddresses.map((address) => ({ provider: toPrismaProvider(provider), address })),
       skipDuplicates: true,
     });
   }
 
-  async findAllAddresses(): Promise<string[]> {
-    const rows = await this.prismaClient.trader.findMany({ select: { address: true } });
-    return rows.map((row) => row.address);
+  async findAllTraderKeys(): Promise<TraderKey[]> {
+    const rows = await this.prismaClient.trader.findMany({
+      select: { provider: true, address: true },
+    });
+    return rows.map((row) => ({ provider: toDomainProvider(row.provider), address: row.address }));
   }
 
-  async findRankableTraders(): Promise<Trader[]> {
+  async findRankableTraders(provider?: Provider): Promise<Trader[]> {
     const rows = await this.prismaClient.traderMetrics.findMany({
-      where: { insufficientData: false },
+      where: {
+        insufficientData: false,
+        ...(provider === undefined ? {} : { provider: toPrismaProvider(provider) }),
+      },
     });
     return rows.map(toTrader);
   }
 
-  async findTraderByAddress(traderAddress: string): Promise<Trader | null> {
-    const row = await this.prismaClient.traderMetrics.findUnique({ where: { traderAddress } });
+  async findTrader(provider: Provider, traderAddress: string): Promise<Trader | null> {
+    const row = await this.prismaClient.traderMetrics.findUnique({
+      where: { provider_traderAddress: { provider: toPrismaProvider(provider), traderAddress } },
+    });
     return row === null ? null : toTrader(row);
   }
 
   async saveTraderMetrics(trader: Trader): Promise<void> {
     const metrics = trader.metricsSnapshot();
+    const provider = toPrismaProvider(trader.provider());
+    const traderAddress = trader.address();
     const data = {
       maxAdverseExcursionPercentile90: toNullableString(metrics.maxAdverseExcursionPercentile90),
       averagingDownRatio: toNullableString(metrics.averagingDownRatio),
@@ -77,8 +92,8 @@ export class TraderRepository implements ITraderRepository {
       insufficientData: metrics.insufficientData,
     };
     await this.prismaClient.traderMetrics.upsert({
-      where: { traderAddress: trader.address() },
-      create: { traderAddress: trader.address(), ...data },
+      where: { provider_traderAddress: { provider, traderAddress } },
+      create: { provider, traderAddress, ...data },
       update: data,
     });
   }

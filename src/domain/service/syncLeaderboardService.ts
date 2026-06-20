@@ -27,7 +27,7 @@ export class SyncLeaderboardService {
     const selected =
       this.maximumTraders === undefined ? leaderboard : leaderboard.slice(0, this.maximumTraders);
     const traderAddresses = selected.map((trader) => trader.address);
-    await this.traderRepository.saveTraders(traderAddresses);
+    await this.traderRepository.saveTraders(this.hyperliquidProxy.provider, traderAddresses);
     return traderAddresses.length;
   }
 }
