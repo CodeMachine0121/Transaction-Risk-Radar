@@ -79,16 +79,18 @@ export class OkxProxy implements ITraderDataProxy {
     }));
   }
 
-  /** OKX pnlRatios（newest-first 的 ratio）→ 依時間遞增的百分比序列。無資料則 undefined。 */
-  private normalizeReturnSeries(
-    pnlRatios: RawOkxLeadTrader['pnlRatios'],
-  ): Decimal[] | undefined {
-    if (pnlRatios === undefined || pnlRatios.length === 0) {
+  /**
+   * OKX pnlRatios 為 newest-first 的「累積」報酬曲線（ratio）。正規化為依時間遞增的「每期」報酬
+   * 百分比序列：先排序為 chronological、×100 轉百分比，再取一階差分。少於兩點則無法推導每期報酬，回 undefined。
+   */
+  private normalizeReturnSeries(pnlRatios: RawOkxLeadTrader['pnlRatios']): Decimal[] | undefined {
+    if (pnlRatios === undefined || pnlRatios.length < 2) {
       return undefined;
     }
-    return [...pnlRatios]
+    const cumulative = [...pnlRatios]
       .sort((left, right) => Number(left.beginTs) - Number(right.beginTs))
       .map((point) => new Decimal(point.pnlRatio).times(HUNDRED));
+    return cumulative.slice(1).map((value, index) => value.minus(cumulative[index] as Decimal));
   }
 
   /**

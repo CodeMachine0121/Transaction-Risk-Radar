@@ -37,7 +37,7 @@ describe('OkxProxy', () => {
     expect(traders[0]?.accountValue.toString()).toBe('154626.43');
   });
 
-  it('carries account return series (chronological) and winRatio from the ranking', async () => {
+  it('differences the cumulative pnlRatios curve into per-period returns and carries winRatio', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       okxResponse([
         {
@@ -47,11 +47,12 @@ describe('OkxProxy', () => {
               aum: '1000',
               nickName: 'a',
               winRatio: '0.6',
-              // OKX 回傳 newest-first；正規化後應為依時間遞增（chronological）
+              // OKX 回傳 newest-first 的「累積」報酬曲線；正規化後應為依時間遞增的「每期」報酬。
               pnlRatios: [
-                { beginTs: '3000', pnlRatio: '0.03' },
-                { beginTs: '2000', pnlRatio: '0.02' },
-                { beginTs: '1000', pnlRatio: '0.01' },
+                { beginTs: '4000', pnlRatio: '0.06' },
+                { beginTs: '3000', pnlRatio: '0.10' },
+                { beginTs: '2000', pnlRatio: '0.03' },
+                { beginTs: '1000', pnlRatio: '0' },
               ],
             },
           ],
@@ -62,8 +63,26 @@ describe('OkxProxy', () => {
     const traders = await buildProxy(fetchMock).fetchTraderList();
 
     expect(traders[0]?.winRatio?.toString()).toBe('0.6');
-    // ratio→percent（×100）且 chronological（beginTs 1000→3000）
-    expect(traders[0]?.accountReturnSeries?.map((value) => value.toString())).toEqual(['1', '2', '3']);
+    // 累積（×100）chronological = [0, 3, 10, 6] → 一階差分（每期報酬）= [3, 7, -4]
+    expect(traders[0]?.accountReturnSeries?.map((value) => value.toString())).toEqual([
+      '3',
+      '7',
+      '-4',
+    ]);
+  });
+
+  it('returns no account series when fewer than two cumulative points exist', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      okxResponse([
+        {
+          ranks: [{ uniqueCode: 'A', aum: '1000', nickName: 'a', winRatio: '0.6', pnlRatios: [{ beginTs: '1000', pnlRatio: '0' }] }],
+        },
+      ]),
+    );
+
+    const traders = await buildProxy(fetchMock).fetchTraderList();
+
+    expect(traders[0]?.accountReturnSeries).toBeUndefined();
   });
 
   it('maps each sub-position into open and close activity legs', async () => {

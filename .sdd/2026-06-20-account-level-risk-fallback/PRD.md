@@ -104,7 +104,9 @@ recompute（per (provider,address)）
 ## 8. Appendix — Open Decisions
 
 1. **`pnlRatios` 語意**（累積 vs 分期）與「每期報酬」推導法——domain 計算與此脫鉤（吃正規化後的序列）。
-   - **實作決議（v1）**：`OkxProxy` 把 `pnlRatios`（newest-first 的 ratio）依 `beginTs` 升冪排成 chronological，並 `×100` 轉百分比，**逐點視為「每期報酬」**（不做累積差分）。語意若經 OKX docs/實測證實為累積，僅需調整邊際轉換、domain 不動。
+   - **已確認（實機資料）**：`pnlRatios` 為 newest-first 的**累積**報酬曲線（每條序列均以 `0` 起點，例：`0, 17.52, 1.72, -3.3, …`）。
+   - **實作決議（v2）**：`OkxProxy.normalizeReturnSeries` 依 `beginTs` 升冪排成 chronological、`×100` 轉百分比，再取**一階差分**得到「每期報酬」交給 domain；少於兩點無法推導 → 不產生序列（該交易員無帳戶級）。domain 不變（`downsideDeviation` 吃每期報酬、`accountDrawdown` 以 `∏(1+r/100)` 還原權益曲線取峰到谷）。
+   - **v1（已汰換）**：曾把累積水位逐點誤當每期報酬，導致下行標準差以累積水位計、單調獲利者風險恆為 0。
 2. **資料不足門檻**：`accountReturnSeries` 最少幾點才算帳戶級（否則 insufficientData）。
    - **實作決議（v1）**：未設下限；只要 `findAccountStats` 有資料即走 fallback。樣本過少的精度問題列為後續校準。
 3. **`accountDrawdown` 的 normalize 上限**與 `riskScore(帳戶版)` 權重（沿用部位級權重、`averagingDown` 項以 0 計？）。
