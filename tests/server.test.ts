@@ -1,12 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import Decimal from 'decimal.js';
 import { buildServer } from '@/server';
+import type { SafeCohortConsensusDto } from '@/domain/dto/safeCohortConsensusDto';
 import type { TraderRiskDto } from '@/domain/dto/traderRiskDto';
+import type { CurrentOpenPosition } from '@/domain/vo/currentOpenPosition';
 import { Provider } from '@/domain/vo/provider';
+import { createMockPositionRepository } from './application/support/mockPositionRepository';
 import {
   buildTrader,
   createMockTraderRepository,
 } from './application/support/mockTraderRepository';
+
+const currentPosition = (
+  traderAddress: string,
+  coin: string,
+  signedSize: number,
+): CurrentOpenPosition => ({
+  traderAddress,
+  coin,
+  signedSize: new Decimal(signedSize),
+  leverage: new Decimal(10),
+  capturedAt: 1000,
+});
 
 let server: FastifyInstance | null = null;
 
@@ -24,7 +40,7 @@ describe('HTTP API', () => {
       buildTrader('A', 70),
       buildTrader('B', 30),
     ]);
-    server = buildServer(repository);
+    server = buildServer(repository, createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/rankings' });
 
@@ -40,7 +56,7 @@ describe('HTTP API', () => {
       buildTrader('A', 70),
       buildTrader('B', 30),
     ]);
-    server = buildServer(repository);
+    server = buildServer(repository, createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/rankings?direction=descending' });
 
@@ -54,7 +70,7 @@ describe('HTTP API', () => {
       buildTrader('A', 70),
       buildTrader('B', null),
     ]);
-    server = buildServer(repository);
+    server = buildServer(repository, createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/traders' });
 
@@ -66,7 +82,7 @@ describe('HTTP API', () => {
   it('GET /traders passes ?provider= to the repository', async () => {
     const repository = createMockTraderRepository();
     vi.mocked(repository.findAllTraders).mockResolvedValue([]);
-    server = buildServer(repository);
+    server = buildServer(repository, createMockPositionRepository());
 
     await server.inject({ method: 'GET', url: '/traders?provider=okx' });
 
@@ -76,7 +92,7 @@ describe('HTTP API', () => {
   it('GET /traders/:address returns the trader detail', async () => {
     const repository = createMockTraderRepository();
     vi.mocked(repository.findTrader).mockResolvedValue(buildTrader('A', 70));
-    server = buildServer(repository);
+    server = buildServer(repository, createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/traders/A' });
 
@@ -87,7 +103,7 @@ describe('HTTP API', () => {
   it('GET /traders/:address returns 404 when the trader is unknown', async () => {
     const repository = createMockTraderRepository();
     vi.mocked(repository.findTrader).mockResolvedValue(null);
-    server = buildServer(repository);
+    server = buildServer(repository, createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/traders/Z' });
 
@@ -97,12 +113,85 @@ describe('HTTP API', () => {
   it('GET /traders/:address resolves by ?provider= (defaults hyperliquid)', async () => {
     const repository = createMockTraderRepository();
     vi.mocked(repository.findTrader).mockResolvedValue(buildTrader('A', 70));
-    server = buildServer(repository);
+    server = buildServer(repository, createMockPositionRepository());
 
     await server.inject({ method: 'GET', url: '/traders/A?provider=okx' });
     expect(repository.findTrader).toHaveBeenCalledWith(Provider.Okx, 'A');
 
     await server.inject({ method: 'GET', url: '/traders/A' });
     expect(repository.findTrader).toHaveBeenCalledWith(Provider.Hyperliquid, 'A');
+  });
+
+  it('GET /consensus returns the disclaimer and per-coin consensus', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findRankableTraders).mockResolvedValue([
+      buildTrader('A', 0),
+      buildTrader('B', 0),
+      buildTrader('C', 0),
+    ]);
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findCurrentOpenPositions).mockResolvedValue([
+      currentPosition('A', 'BTC', 1),
+      currentPosition('B', 'BTC', 1),
+      currentPosition('C', 'BTC', 1),
+    ]);
+    server = buildServer(repository, positionRepository);
+
+    const response = await server.inject({ method: 'GET', url: '/consensus' });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<SafeCohortConsensusDto>();
+    expect(body.disclaimer.length).toBeGreaterThan(0);
+    expect(body.coins[0]?.coin).toBe('BTC');
+    expect(body.coins[0]?.netDirectionBias).toBe('1');
+  });
+
+  it('GET /consensus/:coin returns 200 for a coin with enough participants', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findRankableTraders).mockResolvedValue([
+      buildTrader('A', 0),
+      buildTrader('B', 0),
+      buildTrader('C', 0),
+    ]);
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findCurrentOpenPositions).mockResolvedValue([
+      currentPosition('A', 'BTC', 1),
+      currentPosition('B', 'BTC', 1),
+      currentPosition('C', 'BTC', 1),
+    ]);
+    server = buildServer(repository, positionRepository);
+
+    const response = await server.inject({ method: 'GET', url: '/consensus/BTC' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<SafeCohortConsensusDto>().coins[0]?.coin).toBe('BTC');
+  });
+
+  it('GET /consensus/:coin returns 404 when there is no qualifying consensus', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findRankableTraders).mockResolvedValue([buildTrader('A', 0)]);
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findCurrentOpenPositions).mockResolvedValue([]);
+    server = buildServer(repository, positionRepository);
+
+    const response = await server.inject({ method: 'GET', url: '/consensus/BTC' });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('GET /consensus rejects an out-of-range maxRiskScore with 400', async () => {
+    server = buildServer(createMockTraderRepository(), createMockPositionRepository());
+
+    const response = await server.inject({ method: 'GET', url: '/consensus?maxRiskScore=200' });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('GET /consensus rejects a minParticipants below 1 with 400', async () => {
+    server = buildServer(createMockTraderRepository(), createMockPositionRepository());
+
+    const response = await server.inject({ method: 'GET', url: '/consensus?minParticipants=0' });
+
+    expect(response.statusCode).toBe(400);
   });
 });
