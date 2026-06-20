@@ -2,20 +2,10 @@ import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
 import { PollTraderApplication } from '@/application/pollTraderApplication';
 import { PollTraderService } from '@/domain/service/pollTraderService';
-import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
 import type { OpenPosition } from '@/domain/vo/openPosition';
-import type { PositionSnapshotRecord } from '@/domain/vo/positionSnapshotRecord';
 import type { TraderFill } from '@/domain/vo/traderFill';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
-
-const createMockPositionRepository = (): IPositionRepository => ({
-  saveFills: vi
-    .fn<(traderAddress: string, fills: TraderFill[]) => Promise<void>>()
-    .mockResolvedValue(undefined),
-  saveSnapshots: vi
-    .fn<(traderAddress: string, snapshots: PositionSnapshotRecord[]) => Promise<void>>()
-    .mockResolvedValue(undefined),
-});
+import { createMockPositionRepository } from './support/mockPositionRepository';
 
 const openPosition = (): OpenPosition => ({
   coin: 'ETH',

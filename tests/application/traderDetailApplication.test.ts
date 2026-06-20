@@ -3,12 +3,12 @@ import { TraderDetailApplication } from '@/application/traderDetailApplication';
 import { TraderDetailService } from '@/domain/service/traderDetailService';
 import {
   buildTrader,
-  createMockTraderMetricsRepository,
-} from './support/mockTraderMetricsRepository';
+  createMockTraderRepository,
+} from './support/mockTraderRepository';
 
 describe('TraderDetailApplication', () => {
   it('returns the risk DTO for a known trader address', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findTraderByAddress).mockResolvedValue(buildTrader('A', 70));
     const application = new TraderDetailApplication(new TraderDetailService(repository));
 
@@ -19,7 +19,7 @@ describe('TraderDetailApplication', () => {
   });
 
   it('returns null when the trader is unknown', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findTraderByAddress).mockResolvedValue(null);
     const application = new TraderDetailApplication(new TraderDetailService(repository));
 

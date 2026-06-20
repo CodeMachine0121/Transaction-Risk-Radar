@@ -1,11 +1,11 @@
 import { createPrismaClient } from './infrastructure/persistence/prismaClient';
-import { TraderMetricsRepository } from './infrastructure/persistence/traderMetricsRepository';
+import { TraderRepository } from './infrastructure/persistence/traderRepository';
 import { buildServer } from './server';
 
 // 組裝根 (composition root)：在此選定具體實作並注入。
 const connectionString = process.env.DATABASE_URL ?? '';
 const prismaClient = createPrismaClient(connectionString);
-const repository = new TraderMetricsRepository(prismaClient);
+const repository = new TraderRepository(prismaClient);
 const server = buildServer(repository, { logger: true });
 
 const port = Number(process.env.PORT ?? '3000');

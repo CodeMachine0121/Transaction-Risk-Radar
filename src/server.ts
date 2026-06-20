@@ -3,7 +3,7 @@ import { RiskRankingApplication } from './application/riskRankingApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { RiskRankingController } from './controller/riskRankingController';
 import { TraderDetailController } from './controller/traderDetailController';
-import type { ITraderMetricsRepository } from './domain/interface/iTraderMetricsRepository';
+import type { ITraderRepository } from './domain/interface/iTraderRepository';
 import { RiskRankingService } from './domain/service/riskRankingService';
 import { TraderDetailService } from './domain/service/traderDetailService';
 
@@ -16,7 +16,7 @@ export type BuildServerOptions = {
  * service 無介面、以具體實例注入 application（見 CLAUDE.md 測試策略）。
  */
 export function buildServer(
-  traderMetricsRepository: ITraderMetricsRepository,
+  traderRepository: ITraderRepository,
   options: BuildServerOptions = {},
 ): FastifyInstance {
   const server = Fastify({ logger: options.logger ?? false });
@@ -24,10 +24,10 @@ export function buildServer(
   server.get('/health', () => ({ status: 'ok' }));
 
   const riskRankingController = new RiskRankingController(
-    new RiskRankingApplication(new RiskRankingService(traderMetricsRepository)),
+    new RiskRankingApplication(new RiskRankingService(traderRepository)),
   );
   const traderDetailController = new TraderDetailController(
-    new TraderDetailApplication(new TraderDetailService(traderMetricsRepository)),
+    new TraderDetailApplication(new TraderDetailService(traderRepository)),
   );
   riskRankingController.register(server);
   traderDetailController.register(server);

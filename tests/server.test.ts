@@ -4,8 +4,8 @@ import { buildServer } from '@/server';
 import type { TraderRiskDto } from '@/domain/dto/traderRiskDto';
 import {
   buildTrader,
-  createMockTraderMetricsRepository,
-} from './application/support/mockTraderMetricsRepository';
+  createMockTraderRepository,
+} from './application/support/mockTraderRepository';
 
 let server: FastifyInstance | null = null;
 
@@ -18,7 +18,7 @@ afterEach(async () => {
 
 describe('HTTP API', () => {
   it('GET /rankings returns rankable traders ascending by risk score', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findRankableTraders).mockResolvedValue([
       buildTrader('A', 70),
       buildTrader('B', 30),
@@ -34,7 +34,7 @@ describe('HTTP API', () => {
   });
 
   it('GET /rankings honours the direction query parameter', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findRankableTraders).mockResolvedValue([
       buildTrader('A', 70),
       buildTrader('B', 30),
@@ -48,7 +48,7 @@ describe('HTTP API', () => {
   });
 
   it('GET /traders/:address returns the trader detail', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findTraderByAddress).mockResolvedValue(buildTrader('A', 70));
     server = buildServer(repository);
 
@@ -59,7 +59,7 @@ describe('HTTP API', () => {
   });
 
   it('GET /traders/:address returns 404 when the trader is unknown', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findTraderByAddress).mockResolvedValue(null);
     server = buildServer(repository);
 

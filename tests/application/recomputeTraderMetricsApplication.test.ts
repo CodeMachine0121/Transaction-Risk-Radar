@@ -3,9 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { RecomputeTraderMetricsApplication } from '@/application/recomputeTraderMetricsApplication';
 import { Position } from '@/domain/entity/position';
 import { RecomputeTraderMetricsService } from '@/domain/service/recomputeTraderMetricsService';
-import type { ITraderMetricsWriter } from '@/domain/interface/iTraderMetricsWriter';
-import type { ITraderPositionRepository } from '@/domain/interface/iTraderPositionRepository';
-import type { TraderMetrics } from '@/domain/vo/traderMetrics';
+import { createMockPositionRepository } from './support/mockPositionRepository';
+import { createMockTraderRepository } from './support/mockTraderRepository';
 
 const closedPosition = (hasSnapshot: boolean, coin = 'ETH'): Position =>
   new Position({
@@ -19,30 +18,20 @@ const closedPosition = (hasSnapshot: boolean, coin = 'ETH'): Position =>
     closed: true,
   });
 
-const createMockPositionRepository = (): ITraderPositionRepository => ({
-  findPositions: vi.fn<(traderAddress: string) => Promise<Position[]>>().mockResolvedValue([]),
-});
-
-const createMockMetricsWriter = (): ITraderMetricsWriter => ({
-  saveTraderMetrics: vi
-    .fn<(traderAddress: string, metrics: TraderMetrics) => Promise<void>>()
-    .mockResolvedValue(undefined),
-});
-
-// 真實 RecomputeTraderMetricsService（連帶真實 Trader/Position），只 mock repository / writer 介面。
+// 真實 RecomputeTraderMetricsService（連帶真實 Trader/Position），只 mock repository 介面。
 describe('RecomputeTraderMetricsApplication', () => {
   it('loads positions, recomputes, persists, and returns a DTO', async () => {
     const positionRepository = createMockPositionRepository();
     vi.mocked(positionRepository.findPositions).mockResolvedValue([closedPosition(true)]);
-    const metricsWriter = createMockMetricsWriter();
+    const traderRepository = createMockTraderRepository();
     const application = new RecomputeTraderMetricsApplication(
-      new RecomputeTraderMetricsService(positionRepository, metricsWriter),
+      new RecomputeTraderMetricsService(positionRepository, traderRepository),
     );
 
     const dto = await application.recompute('0xA');
 
     expect(positionRepository.findPositions).toHaveBeenCalledWith('0xA');
-    expect(metricsWriter.saveTraderMetrics).toHaveBeenCalledOnce();
+    expect(traderRepository.saveTraderMetrics).toHaveBeenCalledOnce();
     expect(dto.insufficientData).toBe(true); // 1 closed < minimum 20
     expect(dto.closedPositionCount).toBe(1);
   });
@@ -54,7 +43,7 @@ describe('RecomputeTraderMetricsApplication', () => {
       closedPosition(false, 'BTC'),
     ]);
     const application = new RecomputeTraderMetricsApplication(
-      new RecomputeTraderMetricsService(positionRepository, createMockMetricsWriter()),
+      new RecomputeTraderMetricsService(positionRepository, createMockTraderRepository()),
     );
 
     const dto = await application.recompute('0xA');

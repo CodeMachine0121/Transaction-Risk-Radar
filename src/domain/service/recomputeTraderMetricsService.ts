@@ -1,25 +1,22 @@
 import type { TraderRiskDto } from '../dto/traderRiskDto';
 import { Trader } from '../entity/trader';
-import type { ITraderMetricsWriter } from '../interface/iTraderMetricsWriter';
-import type { ITraderPositionRepository } from '../interface/iTraderPositionRepository';
+import type { IPositionRepository } from '../interface/iPositionRepository';
+import type { ITraderRepository } from '../interface/iTraderRepository';
 
 /** Domain Service（US-05）：載入倉位 → 重算 Trader → 持久化指標 → 回傳 DTO。 */
 export class RecomputeTraderMetricsService {
-  private readonly traderPositionRepository: ITraderPositionRepository;
-  private readonly traderMetricsWriter: ITraderMetricsWriter;
+  private readonly positionRepository: IPositionRepository;
+  private readonly traderRepository: ITraderRepository;
 
-  constructor(
-    traderPositionRepository: ITraderPositionRepository,
-    traderMetricsWriter: ITraderMetricsWriter,
-  ) {
-    this.traderPositionRepository = traderPositionRepository;
-    this.traderMetricsWriter = traderMetricsWriter;
+  constructor(positionRepository: IPositionRepository, traderRepository: ITraderRepository) {
+    this.positionRepository = positionRepository;
+    this.traderRepository = traderRepository;
   }
 
   async recompute(traderAddress: string): Promise<TraderRiskDto> {
-    const positions = await this.traderPositionRepository.findPositions(traderAddress);
+    const positions = await this.positionRepository.findPositions(traderAddress);
     const trader = Trader.reconstruct(traderAddress, positions);
-    await this.traderMetricsWriter.saveTraderMetrics(traderAddress, trader.metricsSnapshot());
+    await this.traderRepository.saveTraderMetrics(trader);
     return trader.toRiskDto();
   }
 }

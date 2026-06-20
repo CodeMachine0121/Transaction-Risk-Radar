@@ -1,16 +1,16 @@
 import type { TraderRiskDto } from '../dto/traderRiskDto';
-import type { ITraderMetricsRepository } from '../interface/iTraderMetricsRepository';
+import type { ITraderRepository } from '../interface/iTraderRepository';
 
 /** Domain Service：單一交易員風險詳情（US-02）。不存在時回傳 null（由 controller 映射 404）。 */
 export class TraderDetailService {
-  private readonly traderMetricsRepository: ITraderMetricsRepository;
+  private readonly traderRepository: ITraderRepository;
 
-  constructor(traderMetricsRepository: ITraderMetricsRepository) {
-    this.traderMetricsRepository = traderMetricsRepository;
+  constructor(traderRepository: ITraderRepository) {
+    this.traderRepository = traderRepository;
   }
 
   async getTraderDetail(traderAddress: string): Promise<TraderRiskDto | null> {
-    const trader = await this.traderMetricsRepository.findTraderByAddress(traderAddress);
+    const trader = await this.traderRepository.findTraderByAddress(traderAddress);
     return trader === null ? null : trader.toRiskDto();
   }
 }

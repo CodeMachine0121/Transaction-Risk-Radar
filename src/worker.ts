@@ -7,8 +7,6 @@ import { SyncLeaderboardService } from './domain/service/syncLeaderboardService'
 import { HyperliquidProxy } from './infrastructure/hyperliquid/hyperliquidProxy';
 import { createPrismaClient } from './infrastructure/persistence/prismaClient';
 import { PositionRepository } from './infrastructure/persistence/positionRepository';
-import { TraderMetricsWriter } from './infrastructure/persistence/traderMetricsWriter';
-import { TraderPositionRepository } from './infrastructure/persistence/traderPositionRepository';
 import { TraderRepository } from './infrastructure/persistence/traderRepository';
 import { Scheduler } from './infrastructure/scheduler/scheduler';
 
@@ -17,8 +15,6 @@ const prismaClient = createPrismaClient(process.env.DATABASE_URL ?? '');
 
 const traderRepository = new TraderRepository(prismaClient);
 const positionRepository = new PositionRepository(prismaClient);
-const traderPositionRepository = new TraderPositionRepository(prismaClient);
-const traderMetricsWriter = new TraderMetricsWriter(prismaClient);
 const hyperliquidProxy = new HyperliquidProxy({
   infoApiBaseUrl: process.env.HYPERLIQUID_API_BASE_URL ?? 'https://api.hyperliquid.xyz',
   statsDataBaseUrl:
@@ -34,7 +30,7 @@ const pollTraderApplication = new PollTraderApplication(
   new PollTraderService(hyperliquidProxy, positionRepository),
 );
 const recomputeTraderMetricsApplication = new RecomputeTraderMetricsApplication(
-  new RecomputeTraderMetricsService(traderPositionRepository, traderMetricsWriter),
+  new RecomputeTraderMetricsService(positionRepository, traderRepository),
 );
 
 const redisUrl = new URL(process.env.REDIS_URL ?? 'redis://localhost:6379');

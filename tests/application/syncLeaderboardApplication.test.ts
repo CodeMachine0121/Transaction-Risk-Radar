@@ -2,13 +2,8 @@ import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
 import { SyncLeaderboardApplication } from '@/application/syncLeaderboardApplication';
 import { SyncLeaderboardService } from '@/domain/service/syncLeaderboardService';
-import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
-
-const createMockTraderRepository = (): ITraderRepository => ({
-  saveTraders: vi.fn<(traderAddresses: string[]) => Promise<void>>().mockResolvedValue(undefined),
-  findAllAddresses: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
-});
+import { createMockTraderRepository } from './support/mockTraderRepository';
 
 const leaderboardTrader = (address: string) => ({ address, accountValue: new Decimal(1000) });
 

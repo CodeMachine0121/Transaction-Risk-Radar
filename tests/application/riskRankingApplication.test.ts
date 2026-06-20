@@ -3,13 +3,13 @@ import { RiskRankingApplication } from '@/application/riskRankingApplication';
 import { RiskRankingService } from '@/domain/service/riskRankingService';
 import {
   buildTrader,
-  createMockTraderMetricsRepository,
-} from './support/mockTraderMetricsRepository';
+  createMockTraderRepository,
+} from './support/mockTraderRepository';
 
 // 測 application 時注入「真實的 domain service + entity」，只 mock repository 介面。
 describe('RiskRankingApplication', () => {
   it('returns traders ranked by ascending risk score by default', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findRankableTraders).mockResolvedValue([
       buildTrader('A', 70),
       buildTrader('B', 30),
@@ -24,7 +24,7 @@ describe('RiskRankingApplication', () => {
   });
 
   it('ranks descending when requested', async () => {
-    const repository = createMockTraderMetricsRepository();
+    const repository = createMockTraderRepository();
     vi.mocked(repository.findRankableTraders).mockResolvedValue([
       buildTrader('A', 70),
       buildTrader('B', 30),

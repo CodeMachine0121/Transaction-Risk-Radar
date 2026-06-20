@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import { vi } from 'vitest';
 import { Trader } from '@/domain/entity/trader';
-import type { ITraderMetricsRepository } from '@/domain/interface/iTraderMetricsRepository';
+import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 
 /** 測試資料工廠：以 stored metrics hydrate 出一個 Trader（給定 riskScore）。 */
 export const buildTrader = (traderAddress: string, riskScore: number | null): Trader =>
@@ -18,9 +18,12 @@ export const buildTrader = (traderAddress: string, riskScore: number | null): Tr
     insufficientData: riskScore === null,
   });
 
-export const createMockTraderMetricsRepository = (): ITraderMetricsRepository => ({
+export const createMockTraderRepository = (): ITraderRepository => ({
+  saveTraders: vi.fn<(traderAddresses: string[]) => Promise<void>>().mockResolvedValue(undefined),
+  findAllAddresses: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
   findRankableTraders: vi.fn<() => Promise<Trader[]>>().mockResolvedValue([]),
   findTraderByAddress: vi
     .fn<(traderAddress: string) => Promise<Trader | null>>()
     .mockResolvedValue(null),
+  saveTraderMetrics: vi.fn<(trader: Trader) => Promise<void>>().mockResolvedValue(undefined),
 });
