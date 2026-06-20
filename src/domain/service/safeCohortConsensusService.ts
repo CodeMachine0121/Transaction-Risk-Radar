@@ -24,6 +24,7 @@ type Contribution = {
   convictionShare: Decimal; // positionNotional / 該交易員當前總 notional
   convictionWeight: Decimal; // inverseRiskWeight × convictionShare
   leverage: Decimal;
+  isNew: boolean; // firstObservedAt 落在最近一個輪詢間隔內
 };
 
 /** 某 coin 聚合中的累加器（risk-加權 與 conviction-加權雙軌）。 */
@@ -36,6 +37,7 @@ type CoinAccumulator = {
   totalConvictionWeight: Decimal; // Σ convictionWeight
   totalConvictionShare: Decimal; // Σ convictionShare（算平均用）
   maxConvictionShare: Decimal; // max convictionShare（單人主導程度）
+  newPositionCount: number; // firstObservedAt 在最近一個輪詢間隔內的人數
   totalLeverage: Decimal;
 };
 
@@ -106,7 +108,10 @@ export class SafeCohortConsensusService {
       return [];
     }
 
-    const freshAfter = this.now() - this.freshnessWindowMilliseconds;
+    const now = this.now();
+    const freshAfter = now - this.freshnessWindowMilliseconds;
+    // 一個輪詢間隔 = 新鮮度窗的一半（窗 = 2 × POLL_INTERVAL_MS）；用於判定「新開倉」。
+    const newPositionThreshold = this.freshnessWindowMilliseconds / 2;
     const tradersByProvider = new Map<Provider, Trader[]>();
     for (const trader of cohort) {
       const bucket = tradersByProvider.get(trader.provider()) ?? [];
@@ -116,7 +121,7 @@ export class SafeCohortConsensusService {
 
     const perProvider = await Promise.all(
       [...tradersByProvider].map(([provider, traders]) =>
-        this.accumulateProvider(provider, traders, freshAfter),
+        this.accumulateProvider(provider, traders, freshAfter, now, newPositionThreshold),
       ),
     );
 
@@ -133,6 +138,8 @@ export class SafeCohortConsensusService {
     provider: Provider,
     traders: Trader[],
     freshAfter: number,
+    now: number,
+    newPositionThreshold: number,
   ): Promise<Contribution[]> {
     const weightByAddress = new Map(traders.map((trader) => [trader.address(), trader.consensusWeight()]));
     const positions = await this.positionRepository.findCurrentOpenPositions(
@@ -166,6 +173,7 @@ export class SafeCohortConsensusService {
         convictionShare,
         convictionWeight: inverseRiskWeight.times(convictionShare),
         leverage: position.leverage,
+        isNew: now - position.firstObservedAt <= newPositionThreshold,
       });
     }
     return contributions;
@@ -184,6 +192,7 @@ export class SafeCohortConsensusService {
       totalConvictionWeight: ZERO,
       totalConvictionShare: ZERO,
       maxConvictionShare: ZERO,
+      newPositionCount: 0,
       totalLeverage: ZERO,
     };
     const sign = contribution.isLong ? ONE : ONE.negated();
@@ -200,6 +209,7 @@ export class SafeCohortConsensusService {
       maxConvictionShare: contribution.convictionShare.greaterThan(current.maxConvictionShare)
         ? contribution.convictionShare
         : current.maxConvictionShare,
+      newPositionCount: current.newPositionCount + (contribution.isNew ? 1 : 0),
       totalLeverage: current.totalLeverage.plus(contribution.leverage),
     });
   }
@@ -230,6 +240,7 @@ export class SafeCohortConsensusService {
         ? '0'
         : accumulator.totalConvictionShare.dividedBy(count).toString(),
       maxConvictionShare: accumulator.maxConvictionShare.toString(),
+      newPositionCount: accumulator.newPositionCount,
       averageLeverage: count.isZero() ? '0' : accumulator.totalLeverage.dividedBy(count).toString(),
     };
   }

@@ -19,5 +19,7 @@ export type CoinConsensusDto = {
   averageConvictionShare: string;
   /** 該 coin 參與者中最大的單一 positionConvictionShare；高代表被單一重押者主導。 */
   maxConvictionShare: string;
+  /** firstObservedAt 落在最近一個輪詢間隔內的參與者數（窗內粗略代理，僅描述）。 */
+  newPositionCount: number;
   averageLeverage: string;
 };

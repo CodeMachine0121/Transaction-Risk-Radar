@@ -161,6 +161,31 @@ describe('SafeCohortConsensusApplication', () => {
     expect(btc?.maxConvictionShare).toBe('1'); // FOCUS 只押 BTC
   });
 
+  it('counts newly observed positions (firstObservedAt within one poll interval)', async () => {
+    const traders = createMockTraderRepository();
+    vi.mocked(traders.findRankableTraders).mockResolvedValue([
+      buildTrader('A', 0),
+      buildTrader('B', 0),
+      buildTrader('C', 0),
+    ]);
+    const positions = createMockPositionRepository();
+    vi.mocked(positions.findCurrentOpenPositions).mockResolvedValue([
+      position('A', 'BTC', 1, 10, 100, 90_000, 80_000), // age 20s ≤ 30s → new
+      position('B', 'BTC', 1, 10, 100, 90_000, 75_000), // age 25s → new
+      position('C', 'BTC', 1, 10, 100, 90_000, 50_000), // age 50s → not new
+    ]);
+    // now=100_000, window=60_000 → poll interval 30_000 → new = firstObservedAt ≥ 70_000
+    const service = new SafeCohortConsensusService(traders, positions, {
+      now: () => 100_000,
+      freshnessWindowMilliseconds: 60_000,
+    });
+    const application = new SafeCohortConsensusApplication(service);
+
+    const btc = (await application.listConsensus({})).coins.find((c) => c.coin === 'BTC');
+
+    expect(btc?.newPositionCount).toBe(2);
+  });
+
   it('excludes traders above maxRiskScore from the cohort and from the query to positions', async () => {
     const traders = createMockTraderRepository();
     vi.mocked(traders.findRankableTraders).mockResolvedValue([
