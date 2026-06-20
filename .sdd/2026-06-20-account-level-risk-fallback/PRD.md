@@ -103,8 +103,11 @@ recompute（per (provider,address)）
 
 ## 8. Appendix — Open Decisions
 
-1. **`pnlRatios` 語意**（累積 vs 分期）與「每期報酬」推導法——動工時對 OKX docs/實測確認；domain 計算與此脫鉤（吃正規化後的序列）。
+1. **`pnlRatios` 語意**（累積 vs 分期）與「每期報酬」推導法——domain 計算與此脫鉤（吃正規化後的序列）。
+   - **實作決議（v1）**：`OkxProxy` 把 `pnlRatios`（newest-first 的 ratio）依 `beginTs` 升冪排成 chronological，並 `×100` 轉百分比，**逐點視為「每期報酬」**（不做累積差分）。語意若經 OKX docs/實測證實為累積，僅需調整邊際轉換、domain 不動。
 2. **資料不足門檻**：`accountReturnSeries` 最少幾點才算帳戶級（否則 insufficientData）。
+   - **實作決議（v1）**：未設下限；只要 `findAccountStats` 有資料即走 fallback。樣本過少的精度問題列為後續校準。
 3. **`accountDrawdown` 的 normalize 上限**與 `riskScore(帳戶版)` 權重（沿用部位級權重、`averagingDown` 項以 0 計？）。
+   - **實作決議（v1）**：`ACCOUNT_DRAWDOWN_CAP = 0.5`（峰到谷以 `∏(1 + r/100)` 計算）。`riskScore(帳戶版)` 沿用部位級權重，只取得到的三項：`normalize(drawdown)×maxAdverseExcursion + trapSignal×trapSignal + normalize(returnDownsideDeviation)×returnDownsideDeviation`，再 `×100`；`averagingDown`/`leverage` 項缺漏（以 null 表示、不計分）。`trapSignal = winRatio × normalize(drawdown)`。
 4. **⚠️ Brief Q3 修訂**：原訂「不存原始序列」；但 sync 與 recompute 為不同階段，需在 sync 持久化**最小彙總（winRatio + 報酬序列）**到 `trader_account_stats`（或 `traders` 欄位）供 recompute 取用。理由：保持 recompute 為唯一 metric 寫入點、避免跨階段重抓。屬小量資料，可接受。
 5. 相關文件：`.sdd/2026-06-20-multi-source-trader-ranking/`、`.sdd/2026-06-20-list-tracked-traders/`、主 PRD §4；UL-MAP 已加 `riskScoreTier`/`accountReturnSeries`/`accountDrawdown`/`computeAccountLevelRisk`。
