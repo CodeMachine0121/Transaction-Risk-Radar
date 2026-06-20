@@ -10,4 +10,6 @@ export interface IPositionRepository {
   saveSnapshots(traderAddress: string, snapshots: PositionSnapshotRecord[]): Promise<void>;
   /** 載入交易員倉位（由原始成交重建並掛回 snapshot）。 */
   findPositions(traderAddress: string): Promise<Position[]>;
+  /** 該交易員已落庫成交的最新時間（ms epoch）；無成交回傳 null。供 high-watermark 增量抓取。 */
+  latestObservedFillTimestamp(traderAddress: string): Promise<number | null>;
 }

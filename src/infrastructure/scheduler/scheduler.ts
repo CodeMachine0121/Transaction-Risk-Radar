@@ -16,8 +16,6 @@ export type SchedulerOptions = {
   syncIntervalMs: number;
   pollIntervalMs: number;
   recomputeIntervalMs: number;
-  /** poll 抓取成交的回看時間窗（ms）。 */
-  pollLookbackMs: number;
   /** 單一 trader 處理失敗時的回報（不中斷整批）；未提供則寫 stderr。 */
   onTraderError?: (phase: 'poll' | 'recompute', traderAddress: string, error: Error) => void;
 };
@@ -86,13 +84,12 @@ export class Scheduler {
     await queue.add(name, {}, { repeat: { every: everyMilliseconds } });
   }
 
-  /** 輪詢每位 trader；單一失敗只回報不中斷整批。 */
+  /** 輪詢每位 trader（startTime 由 PollTraderService 以 high-watermark 解析）；單一失敗只回報不中斷整批。 */
   async pollAllTraders(): Promise<void> {
     const addresses = await this.applications.traderRepository.findAllAddresses();
-    const fillsSince = Date.now() - this.options.pollLookbackMs;
     for (const address of addresses) {
       try {
-        await this.applications.pollTraderApplication.poll(address, fillsSince);
+        await this.applications.pollTraderApplication.poll(address);
       } catch (caught) {
         this.reportTraderError(
           'poll',

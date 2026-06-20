@@ -38,8 +38,11 @@ const syncLeaderboardApplication = new SyncLeaderboardApplication(
     maximumTraders: Number(process.env.MAXIMUM_TRADERS ?? '200'),
   }),
 );
+const ninetyDaysMilliseconds = 90 * 24 * 60 * 60 * 1000;
 const pollTraderApplication = new PollTraderApplication(
-  new PollTraderService(hyperliquidProxy, positionRepository),
+  new PollTraderService(hyperliquidProxy, positionRepository, {
+    lookbackMilliseconds: Number(process.env.POLL_LOOKBACK_MS ?? `${ninetyDaysMilliseconds}`),
+  }),
 );
 const recomputeTraderMetricsApplication = new RecomputeTraderMetricsApplication(
   new RecomputeTraderMetricsService(positionRepository, traderRepository),
@@ -53,7 +56,6 @@ const connection = {
   ...(redisUrl.username === '' ? {} : { username: redisUrl.username }),
 };
 
-const ninetyDaysMilliseconds = 90 * 24 * 60 * 60 * 1000;
 const scheduler = new Scheduler(
   {
     syncLeaderboardApplication,
@@ -66,7 +68,6 @@ const scheduler = new Scheduler(
     syncIntervalMs: Number(process.env.SYNC_INTERVAL_MS ?? `${60 * 60 * 1000}`),
     pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? `${30 * 1000}`),
     recomputeIntervalMs: Number(process.env.RECOMPUTE_INTERVAL_MS ?? `${5 * 60 * 1000}`),
-    pollLookbackMs: Number(process.env.POLL_LOOKBACK_MS ?? `${ninetyDaysMilliseconds}`),
   },
 );
 

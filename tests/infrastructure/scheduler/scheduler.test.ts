@@ -26,7 +26,9 @@ const buildScheduler = (deps: {
         new SyncLeaderboardService(deps.hyperliquidProxy, deps.traderRepository),
       ),
       pollTraderApplication: new PollTraderApplication(
-        new PollTraderService(deps.hyperliquidProxy, deps.positionRepository),
+        new PollTraderService(deps.hyperliquidProxy, deps.positionRepository, {
+          lookbackMilliseconds: 1000,
+        }),
       ),
       recomputeTraderMetricsApplication: new RecomputeTraderMetricsApplication(
         new RecomputeTraderMetricsService(deps.positionRepository, deps.traderRepository),
@@ -38,7 +40,6 @@ const buildScheduler = (deps: {
       syncIntervalMs: 1000,
       pollIntervalMs: 1000,
       recomputeIntervalMs: 1000,
-      pollLookbackMs: 1000,
       onTraderError: deps.onTraderError,
     },
   );
