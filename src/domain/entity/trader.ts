@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import type { TraderRiskDto } from '../dto/traderRiskDto';
+import type { AccountStats } from '../vo/accountStats';
 import type { TraderMetrics } from '../vo/traderMetrics';
 import type { Provider } from '../vo/provider';
 import { DEFAULT_RISK_SCORE_WEIGHTS, type RiskScoreWeights } from '../vo/riskScoreWeights';
@@ -12,9 +13,52 @@ const PERCENTILE_90 = new Decimal('0.9');
 const MAX_ADVERSE_EXCURSION_CAP = new Decimal(50);
 const AVERAGE_LEVERAGE_CAP = new Decimal(20);
 const RETURN_DOWNSIDE_DEVIATION_CAP = new Decimal(30);
+const ACCOUNT_DRAWDOWN_CAP = new Decimal('0.5');
 const DEFAULT_MINIMUM_CLOSED_POSITIONS = 20;
 const DEFAULT_METRICS_WINDOW_DAYS = 90;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** 報酬序列（百分比）中僅取負報酬部分的標準差。衡量「賠的時候穩不穩」。 */
+const downsideDeviation = (returns: Decimal[]): Decimal => {
+  const negatives = returns.filter((value) => value.lessThan(ZERO));
+  if (negatives.length === 0) {
+    return ZERO;
+  }
+  const count = new Decimal(negatives.length);
+  const mean = negatives.reduce((total, value) => total.plus(value), ZERO).dividedBy(count);
+  const sumSquaredDeviations = negatives.reduce(
+    (total, value) => total.plus(value.minus(mean).pow(2)),
+    ZERO,
+  );
+  return sumSquaredDeviations.dividedBy(count).sqrt();
+};
+
+/** 把值除以上限後夾到 [0,1]，作為 riskScore 各因子的正規化。 */
+const normalize = (value: Decimal, cap: Decimal): Decimal => {
+  const ratio = value.dividedBy(cap);
+  if (ratio.lessThan(ZERO)) {
+    return ZERO;
+  }
+  return ratio.greaterThan(ONE) ? ONE : ratio;
+};
+
+/** 由每期報酬（百分比）重建權益曲線，取最大峰到谷回撤（比率 0..1）。 */
+const accountDrawdown = (returnsPercent: Decimal[]): Decimal => {
+  let equity = ONE;
+  let peak = ONE;
+  let maxDrawdown = ZERO;
+  for (const returnPercent of returnsPercent) {
+    equity = equity.times(ONE.plus(returnPercent.dividedBy(HUNDRED)));
+    if (equity.greaterThan(peak)) {
+      peak = equity;
+    }
+    const drawdown = peak.isZero() ? ZERO : peak.minus(equity).dividedBy(peak);
+    if (drawdown.greaterThan(maxDrawdown)) {
+      maxDrawdown = drawdown;
+    }
+  }
+  return maxDrawdown;
+};
 
 export type TraderReconstructOptions = {
   minimumClosedPositions?: number;
@@ -77,6 +121,7 @@ export class Trader {
 
     if (closedPositionCount < minimumClosedPositions) {
       return new Trader(provider, traderAddress, {
+        riskScoreTier: 'position',
         maxAdverseExcursionPercentile90: null,
         averagingDownRatio: null,
         winRate: null,
@@ -105,28 +150,6 @@ export class Trader {
       }
       const upper = sorted[lowerIndex + 1] ?? lower;
       return lower.plus(upper.minus(lower).times(fraction));
-    };
-
-    const downsideDeviation = (returns: Decimal[]): Decimal => {
-      const negatives = returns.filter((value) => value.lessThan(ZERO));
-      if (negatives.length === 0) {
-        return ZERO;
-      }
-      const count = new Decimal(negatives.length);
-      const mean = negatives.reduce((total, value) => total.plus(value), ZERO).dividedBy(count);
-      const sumSquaredDeviations = negatives.reduce(
-        (total, value) => total.plus(value.minus(mean).pow(2)),
-        ZERO,
-      );
-      return sumSquaredDeviations.dividedBy(count).sqrt();
-    };
-
-    const normalize = (value: Decimal, cap: Decimal): Decimal => {
-      const ratio = value.dividedBy(cap);
-      if (ratio.lessThan(ZERO)) {
-        return ZERO;
-      }
-      return ratio.greaterThan(ONE) ? ONE : ratio;
     };
 
     const maxAdverseExcursionPercentile90 = percentile90(
@@ -166,6 +189,7 @@ export class Trader {
       .times(HUNDRED);
 
     return new Trader(provider, traderAddress, {
+      riskScoreTier: 'position',
       maxAdverseExcursionPercentile90,
       averagingDownRatio,
       winRate,
@@ -175,6 +199,45 @@ export class Trader {
       trapSignal,
       riskScore,
       closedPositionCount,
+      insufficientData: false,
+    });
+  }
+
+  /**
+   * 帳戶級（粗版）風險：部位抓不到時的 fallback。由每期報酬序列 + winRatio 推估
+   * 下行標準差、帳戶回撤、陷阱訊號 → riskScore（tier=account）。無法測攤平/槓桿（以 0 不計）。
+   */
+  static fromAccountStats(
+    provider: Provider,
+    traderAddress: string,
+    stats: AccountStats,
+    options: { weights?: RiskScoreWeights } = {},
+  ): Trader {
+    const weights = options.weights ?? DEFAULT_RISK_SCORE_WEIGHTS;
+    const returnDownsideDeviation = downsideDeviation(stats.returnSeries);
+    const normalizedDrawdown = normalize(accountDrawdown(stats.returnSeries), ACCOUNT_DRAWDOWN_CAP);
+    const trapSignal = stats.winRatio.times(normalizedDrawdown);
+    const riskScore = normalizedDrawdown
+      .times(weights.maxAdverseExcursion)
+      .plus(trapSignal.times(weights.trapSignal))
+      .plus(
+        normalize(returnDownsideDeviation, RETURN_DOWNSIDE_DEVIATION_CAP).times(
+          weights.returnDownsideDeviation,
+        ),
+      )
+      .times(HUNDRED);
+
+    return new Trader(provider, traderAddress, {
+      riskScoreTier: 'account',
+      maxAdverseExcursionPercentile90: null,
+      averagingDownRatio: null,
+      winRate: stats.winRatio,
+      realizedProfitAndLoss: null,
+      returnDownsideDeviation,
+      averageLeverage: null,
+      trapSignal,
+      riskScore,
+      closedPositionCount: 0,
       insufficientData: false,
     });
   }
@@ -205,6 +268,7 @@ export class Trader {
       value === null ? null : value.toString();
     return {
       provider: this.traderProvider,
+      tier: this.metrics.riskScoreTier,
       traderAddress: this.traderAddress,
       insufficientData: this.metrics.insufficientData,
       closedPositionCount: this.metrics.closedPositionCount,

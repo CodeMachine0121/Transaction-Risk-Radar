@@ -19,6 +19,7 @@ const toNullableString = (value: Decimal | null): string | null =>
 
 const toTrader = (row: TraderMetricsRow): Trader => {
   const metrics: TraderMetrics = {
+    riskScoreTier: 'position', // 過渡：A2 加 risk_score_tier 欄後改讀 row
     maxAdverseExcursionPercentile90: toDomainDecimal(row.maxAdverseExcursionPercentile90),
     averagingDownRatio: toDomainDecimal(row.averagingDownRatio),
     winRate: toDomainDecimal(row.winRate),

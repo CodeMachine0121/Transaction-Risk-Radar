@@ -154,12 +154,14 @@ describe('Trader.fromStoredMetrics', () => {
       riskScore: new Decimal('68.5'),
       closedPositionCount: 30,
       insufficientData: false,
+      riskScoreTier: 'position',
     };
     const trader = Trader.fromStoredMetrics(Provider.Hyperliquid, '0xB', metrics);
 
     expect(trader.riskScore()?.toString()).toBe('68.5');
     expect(trader.toRiskDto().traderAddress).toBe('0xB');
     expect(trader.toRiskDto().winRate).toBe('1');
+    expect(trader.toRiskDto().tier).toBe('position');
   });
 
   it('carries the provider through to the DTO', () => {
@@ -174,10 +176,29 @@ describe('Trader.fromStoredMetrics', () => {
       riskScore: null,
       closedPositionCount: 0,
       insufficientData: true,
+      riskScoreTier: 'position',
     };
     const trader = Trader.fromStoredMetrics(Provider.Hyperliquid, '0xB', metrics);
 
     expect(trader.toRiskDto().provider).toBe('hyperliquid');
     expect(trader.toRiskDto().traderAddress).toBe('0xB');
+  });
+});
+
+describe('Trader.fromAccountStats', () => {
+  it('computes an account-tier coarse risk score from a return series + winRatio', () => {
+    const trader = Trader.fromAccountStats(Provider.Okx, 'OKX1', {
+      winRatio: new Decimal('0.5'),
+      returnSeries: [10, -20, 5, -10].map((value) => new Decimal(value)),
+    });
+    const dto = trader.toRiskDto();
+
+    expect(dto.tier).toBe('account');
+    expect(dto.insufficientData).toBe(false);
+    expect(dto.riskScore).not.toBeNull();
+    expect(dto.winRate).toBe('0.5');
+    expect(dto.returnDownsideDeviation).toBe('5'); // negatives -20,-10 → mean -15 → std 5
+    expect(dto.averagingDownRatio).toBeNull(); // 帳戶級無法測攤平
+    expect(dto.maxAdverseExcursionPercentile90).toBeNull(); // 非部位級 MAE
   });
 });

@@ -4,6 +4,7 @@
  */
 export type TraderRiskDto = {
   provider: string;
+  tier: string;
   traderAddress: string;
   insufficientData: boolean;
   closedPositionCount: number;

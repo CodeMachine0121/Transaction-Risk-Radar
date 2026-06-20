@@ -1,7 +1,9 @@
 import type Decimal from 'decimal.js';
+import type { RiskScoreTier } from './riskScoreTier';
 
 /** 交易員彙總指標（Trader entity 的計算結果，亦對應持久化的 trader_metrics）。 */
 export type TraderMetrics = {
+  riskScoreTier: RiskScoreTier;
   maxAdverseExcursionPercentile90: Decimal | null;
   averagingDownRatio: Decimal | null;
   winRate: Decimal | null;

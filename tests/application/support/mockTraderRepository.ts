@@ -12,6 +12,7 @@ export const buildTrader = (
   provider: Provider = Provider.Hyperliquid,
 ): Trader =>
   Trader.fromStoredMetrics(provider, traderAddress, {
+    riskScoreTier: 'position',
     maxAdverseExcursionPercentile90: null,
     averagingDownRatio: null,
     winRate: null,
