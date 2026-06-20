@@ -2,9 +2,13 @@ import Decimal from 'decimal.js';
 import type { PrismaClient, TraderMetrics as TraderMetricsRow } from '@prisma/client';
 import { Trader } from '../../domain/entity/trader';
 import type { ITraderRepository } from '../../domain/interface/iTraderRepository';
+import type { AccountStats } from '../../domain/vo/accountStats';
 import { Provider } from '../../domain/vo/provider';
+import type { RiskScoreTier } from '../../domain/vo/riskScoreTier';
 import type { TraderKey } from '../../domain/vo/traderKey';
 import type { TraderMetrics } from '../../domain/vo/traderMetrics';
+
+const toDomainTier = (value: string): RiskScoreTier => (value === 'account' ? 'account' : 'position');
 
 const toDomainProvider = (value: string): Provider =>
   value === 'okx' ? Provider.Okx : Provider.Hyperliquid;
@@ -19,7 +23,7 @@ const toNullableString = (value: Decimal | null): string | null =>
 
 const toTrader = (row: TraderMetricsRow): Trader => {
   const metrics: TraderMetrics = {
-    riskScoreTier: 'position', // 過渡：A2 加 risk_score_tier 欄後改讀 row
+    riskScoreTier: toDomainTier(row.riskScoreTier),
     maxAdverseExcursionPercentile90: toDomainDecimal(row.maxAdverseExcursionPercentile90),
     averagingDownRatio: toDomainDecimal(row.averagingDownRatio),
     winRate: toDomainDecimal(row.winRate),
@@ -88,6 +92,7 @@ export class TraderRepository implements ITraderRepository {
     const provider = toPrismaProvider(trader.provider());
     const traderAddress = trader.address();
     const data = {
+      riskScoreTier: metrics.riskScoreTier,
       maxAdverseExcursionPercentile90: toNullableString(metrics.maxAdverseExcursionPercentile90),
       averagingDownRatio: toNullableString(metrics.averagingDownRatio),
       winRate: toNullableString(metrics.winRate),
@@ -104,5 +109,34 @@ export class TraderRepository implements ITraderRepository {
       create: { provider, traderAddress, ...data },
       update: data,
     });
+  }
+
+  async saveAccountStats(
+    provider: Provider,
+    address: string,
+    stats: AccountStats,
+  ): Promise<void> {
+    const data = {
+      winRatio: stats.winRatio.toString(),
+      returnSeries: stats.returnSeries.map((value) => value.toString()),
+    };
+    await this.prismaClient.traderAccountStats.upsert({
+      where: { provider_address: { provider: toPrismaProvider(provider), address } },
+      create: { provider: toPrismaProvider(provider), address, ...data },
+      update: data,
+    });
+  }
+
+  async findAccountStats(provider: Provider, address: string): Promise<AccountStats | null> {
+    const row = await this.prismaClient.traderAccountStats.findUnique({
+      where: { provider_address: { provider: toPrismaProvider(provider), address } },
+    });
+    if (row === null) {
+      return null;
+    }
+    return {
+      winRatio: new Decimal(row.winRatio.toString()),
+      returnSeries: row.returnSeries.map((value) => new Decimal(value)),
+    };
   }
 }

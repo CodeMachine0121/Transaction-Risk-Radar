@@ -1,4 +1,5 @@
 import type { Trader } from '../entity/trader';
+import type { AccountStats } from '../vo/accountStats';
 import type { Provider } from '../vo/provider';
 import type { TraderKey } from '../vo/traderKey';
 
@@ -16,4 +17,8 @@ export interface ITraderRepository {
   findTrader(provider: Provider, traderAddress: string): Promise<Trader | null>;
   /** 持久化交易員重算後的彙總指標（trader 自帶 provider）。 */
   saveTraderMetrics(trader: Trader): Promise<void>;
+  /** 持久化某交易員的帳戶級彙總（fallback 輸入；僅有報酬序列的來源寫入）。 */
+  saveAccountStats(provider: Provider, address: string, stats: AccountStats): Promise<void>;
+  /** 取得某交易員的帳戶級彙總；無則 null。 */
+  findAccountStats(provider: Provider, address: string): Promise<AccountStats | null>;
 }

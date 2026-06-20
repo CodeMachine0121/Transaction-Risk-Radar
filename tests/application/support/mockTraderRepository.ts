@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { vi } from 'vitest';
 import { Trader } from '@/domain/entity/trader';
 import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
+import type { AccountStats } from '@/domain/vo/accountStats';
 import { Provider } from '@/domain/vo/provider';
 import type { TraderKey } from '@/domain/vo/traderKey';
 
@@ -36,4 +37,10 @@ export const createMockTraderRepository = (): ITraderRepository => ({
     .fn<(provider: Provider, traderAddress: string) => Promise<Trader | null>>()
     .mockResolvedValue(null),
   saveTraderMetrics: vi.fn<(trader: Trader) => Promise<void>>().mockResolvedValue(undefined),
+  saveAccountStats: vi
+    .fn<(provider: Provider, address: string, stats: AccountStats) => Promise<void>>()
+    .mockResolvedValue(undefined),
+  findAccountStats: vi
+    .fn<(provider: Provider, address: string) => Promise<AccountStats | null>>()
+    .mockResolvedValue(null),
 });

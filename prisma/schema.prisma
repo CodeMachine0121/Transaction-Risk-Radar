@@ -71,6 +71,7 @@ model PositionSnapshot {
 model TraderMetrics {
   provider                        Provider
   traderAddress                   String   @map("trader_address")
+  riskScoreTier                   String   @default("position") @map("risk_score_tier")
   maxAdverseExcursionPercentile90 Decimal? @map("max_adverse_excursion_percentile_90") @db.Decimal(18, 8)
   averagingDownRatio              Decimal? @map("averaging_down_ratio") @db.Decimal(9, 8)
   winRate                         Decimal? @map("win_rate") @db.Decimal(9, 8)
@@ -87,4 +88,16 @@ model TraderMetrics {
 
   @@id([provider, traderAddress])
   @@map("trader_metrics")
+}
+
+/// provider 排行提供的帳戶級彙總（看不到逐筆部位時的 fallback 輸入）。僅有報酬序列的來源（如 OKX）會寫入。
+model TraderAccountStats {
+  provider     Provider
+  address      String
+  winRatio     Decimal  @map("win_ratio") @db.Decimal(9, 8)
+  returnSeries String[] @map("return_series")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@id([provider, address])
+  @@map("trader_account_stats")
 }
