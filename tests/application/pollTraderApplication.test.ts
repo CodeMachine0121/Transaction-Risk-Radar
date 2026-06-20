@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
 import { PollTraderApplication } from '@/application/pollTraderApplication';
 import { PollTraderService } from '@/domain/service/pollTraderService';
-import type { IHyperliquidProxy } from '@/domain/interface/iHyperliquidProxy';
+import type { ITraderDataProxy } from '@/domain/interface/iTraderDataProxy';
 import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
 import type { OpenPosition } from '@/domain/vo/openPosition';
 import type { TraderActivity } from '@/domain/vo/traderActivity';
@@ -30,7 +30,7 @@ const fill = (): TraderActivity => ({
 });
 
 const buildApplication = (
-  proxy: IHyperliquidProxy,
+  proxy: ITraderDataProxy,
   positionRepository: IPositionRepository,
   options: { lookbackMilliseconds: number; now?: () => number },
 ): PollTraderApplication =>
@@ -39,7 +39,7 @@ const buildApplication = (
 describe('PollTraderApplication', () => {
   it('fetches activities since the latest observed timestamp and saves them', async () => {
     const proxy = createMockHyperliquidProxy();
-    vi.mocked(proxy.fetchUserFills).mockResolvedValue([fill()]);
+    vi.mocked(proxy.fetchPositionActivities).mockResolvedValue([fill()]);
     const positionRepository = createMockPositionRepository();
     vi.mocked(positionRepository.latestActivityTimestamp).mockResolvedValue(5000);
     const application = buildApplication(proxy, positionRepository, {
@@ -48,7 +48,7 @@ describe('PollTraderApplication', () => {
 
     await application.poll('0xA');
 
-    expect(proxy.fetchUserFills).toHaveBeenCalledWith('0xA', 5000);
+    expect(proxy.fetchPositionActivities).toHaveBeenCalledWith('0xA', 5000);
     expect(positionRepository.saveActivities).toHaveBeenCalledWith('0xA', [fill()]);
   });
 
@@ -63,7 +63,7 @@ describe('PollTraderApplication', () => {
 
     await application.poll('0xA');
 
-    expect(proxy.fetchUserFills).toHaveBeenCalledWith('0xA', 7000);
+    expect(proxy.fetchPositionActivities).toHaveBeenCalledWith('0xA', 7000);
   });
 
   it('snapshots open positions with ROI unrealized percentage and derived mark price', async () => {

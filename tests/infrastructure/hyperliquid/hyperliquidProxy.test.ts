@@ -19,6 +19,10 @@ const buildProxy = (fetchFunction: typeof fetch): HyperliquidProxy =>
   });
 
 describe('HyperliquidProxy', () => {
+  it('identifies its provider as hyperliquid', () => {
+    expect(buildProxy(vi.fn()).provider).toBe('hyperliquid');
+  });
+
   it('fetches and normalizes the leaderboard', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
@@ -29,7 +33,7 @@ describe('HyperliquidProxy', () => {
       }),
     );
 
-    const traders = await buildProxy(fetchMock).fetchLeaderboard();
+    const traders = await buildProxy(fetchMock).fetchTraderList();
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://stats-data.hyperliquid.xyz/Mainnet/leaderboard',
@@ -90,7 +94,7 @@ describe('HyperliquidProxy', () => {
       ]),
     );
 
-    const activities = await buildProxy(fetchMock).fetchUserFills('0xabc', 1681222254000);
+    const activities = await buildProxy(fetchMock).fetchPositionActivities('0xabc', 1681222254000);
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(requestBody.type).toBe('userFillsByTime');
@@ -137,7 +141,7 @@ describe('HyperliquidProxy', () => {
       requestWeightLimiter: limiter,
     });
 
-    await proxy.fetchUserFills('0xabc', 1000);
+    await proxy.fetchPositionActivities('0xabc', 1000);
 
     expect(acquireSpy).toHaveBeenCalledWith(20);
   });
@@ -155,7 +159,7 @@ describe('HyperliquidProxy', () => {
       requestWeightLimiter: limiter,
     });
 
-    await proxy.fetchLeaderboard();
+    await proxy.fetchTraderList();
 
     expect(acquireSpy).not.toHaveBeenCalled();
   });
@@ -271,7 +275,7 @@ describe('HyperliquidProxy 429 backoff', () => {
       requestWeightLimiter: limiter,
     });
 
-    await proxy.fetchLeaderboard();
+    await proxy.fetchTraderList();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(acquireSpy).not.toHaveBeenCalled();

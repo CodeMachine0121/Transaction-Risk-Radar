@@ -1,7 +1,8 @@
 import Decimal from 'decimal.js';
-import type { IHyperliquidProxy } from '../../domain/interface/iHyperliquidProxy';
+import type { ITraderDataProxy } from '../../domain/interface/iTraderDataProxy';
 import type { LeaderboardTrader } from '../../domain/vo/leaderboardTrader';
 import type { OpenPosition } from '../../domain/vo/openPosition';
+import { Provider } from '../../domain/vo/provider';
 import type { TraderActivity } from '../../domain/vo/traderActivity';
 import type { RequestWeightLimiter } from '../../shared/rateLimit/requestWeightLimiter';
 import type { RawClearinghouseState, RawFill, RawLeaderboardResponse } from './hyperliquidWire';
@@ -46,7 +47,8 @@ export type HyperliquidProxyOptions = {
 };
 
 /** 以 HTTP 呼叫 Hyperliquid 公開讀取 API，並正規化為 domain 使用的型別。 */
-export class HyperliquidProxy implements IHyperliquidProxy {
+export class HyperliquidProxy implements ITraderDataProxy {
+  readonly provider = Provider.Hyperliquid;
   private readonly infoApiBaseUrl: string;
   private readonly statsDataBaseUrl: string;
   private readonly fetchFunction: typeof fetch;
@@ -65,7 +67,7 @@ export class HyperliquidProxy implements IHyperliquidProxy {
     this.random = options.random ?? Math.random;
   }
 
-  async fetchLeaderboard(): Promise<LeaderboardTrader[]> {
+  async fetchTraderList(): Promise<LeaderboardTrader[]> {
     const response = await this.fetchWithRetry(`${this.statsDataBaseUrl}/Mainnet/leaderboard`);
     if (!response.ok) {
       throw new Error(`Hyperliquid leaderboard request failed with status ${response.status}`);
@@ -96,7 +98,7 @@ export class HyperliquidProxy implements IHyperliquidProxy {
     }));
   }
 
-  async fetchUserFills(address: string, startTime: number): Promise<TraderActivity[]> {
+  async fetchPositionActivities(address: string, startTime: number): Promise<TraderActivity[]> {
     const data = await this.postInfo<RawFill[]>(
       {
         type: 'userFillsByTime',

@@ -1,4 +1,4 @@
-import type { IHyperliquidProxy } from '../interface/iHyperliquidProxy';
+import type { ITraderDataProxy } from '../interface/iTraderDataProxy';
 import type { ITraderRepository } from '../interface/iTraderRepository';
 
 export type SyncLeaderboardOptions = {
@@ -8,12 +8,12 @@ export type SyncLeaderboardOptions = {
 
 /** Domain Service（US-03）：從 Hyperliquid leaderboard 同步追蹤名單。回傳同步的交易員數。 */
 export class SyncLeaderboardService {
-  private readonly hyperliquidProxy: IHyperliquidProxy;
+  private readonly hyperliquidProxy: ITraderDataProxy;
   private readonly traderRepository: ITraderRepository;
   private readonly maximumTraders: number | undefined;
 
   constructor(
-    hyperliquidProxy: IHyperliquidProxy,
+    hyperliquidProxy: ITraderDataProxy,
     traderRepository: ITraderRepository,
     options: SyncLeaderboardOptions = {},
   ) {
@@ -23,7 +23,7 @@ export class SyncLeaderboardService {
   }
 
   async sync(): Promise<number> {
-    const leaderboard = await this.hyperliquidProxy.fetchLeaderboard();
+    const leaderboard = await this.hyperliquidProxy.fetchTraderList();
     const selected =
       this.maximumTraders === undefined ? leaderboard : leaderboard.slice(0, this.maximumTraders);
     const traderAddresses = selected.map((trader) => trader.address);

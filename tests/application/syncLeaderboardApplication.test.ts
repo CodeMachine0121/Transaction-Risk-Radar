@@ -10,7 +10,7 @@ const leaderboardTrader = (address: string) => ({ address, accountValue: new Dec
 describe('SyncLeaderboardApplication', () => {
   it('fetches the leaderboard and saves every trader address', async () => {
     const proxy = createMockHyperliquidProxy();
-    vi.mocked(proxy.fetchLeaderboard).mockResolvedValue([
+    vi.mocked(proxy.fetchTraderList).mockResolvedValue([
       leaderboardTrader('0xA'),
       leaderboardTrader('0xB'),
     ]);
@@ -27,7 +27,7 @@ describe('SyncLeaderboardApplication', () => {
 
   it('caps the synced traders to the configured maximum', async () => {
     const proxy = createMockHyperliquidProxy();
-    vi.mocked(proxy.fetchLeaderboard).mockResolvedValue([
+    vi.mocked(proxy.fetchTraderList).mockResolvedValue([
       leaderboardTrader('0xA'),
       leaderboardTrader('0xB'),
       leaderboardTrader('0xC'),

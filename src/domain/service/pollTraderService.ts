@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import type { IHyperliquidProxy } from '../interface/iHyperliquidProxy';
+import type { ITraderDataProxy } from '../interface/iTraderDataProxy';
 import type { IPositionRepository } from '../interface/iPositionRepository';
 import type { OpenPosition } from '../vo/openPosition';
 import type { PositionSnapshotRecord } from '../vo/positionSnapshotRecord';
@@ -20,13 +20,13 @@ export type PollTraderServiceOptions = {
  * （ROI 未實現報酬率 + 由 positionValue 推得的 markPrice）。
  */
 export class PollTraderService {
-  private readonly hyperliquidProxy: IHyperliquidProxy;
+  private readonly hyperliquidProxy: ITraderDataProxy;
   private readonly positionRepository: IPositionRepository;
   private readonly lookbackMilliseconds: number;
   private readonly now: () => number;
 
   constructor(
-    hyperliquidProxy: IHyperliquidProxy,
+    hyperliquidProxy: ITraderDataProxy,
     positionRepository: IPositionRepository,
     options: PollTraderServiceOptions,
   ) {
@@ -39,7 +39,7 @@ export class PollTraderService {
   async poll(traderAddress: string): Promise<void> {
     const latest = await this.positionRepository.latestActivityTimestamp(traderAddress);
     const startTime = latest ?? this.now() - this.lookbackMilliseconds;
-    const activities = await this.hyperliquidProxy.fetchUserFills(traderAddress, startTime);
+    const activities = await this.hyperliquidProxy.fetchPositionActivities(traderAddress, startTime);
     await this.positionRepository.saveActivities(traderAddress, activities);
 
     const openPositions = await this.hyperliquidProxy.fetchOpenPositions(traderAddress);

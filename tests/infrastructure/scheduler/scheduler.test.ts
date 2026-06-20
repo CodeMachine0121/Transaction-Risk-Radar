@@ -5,7 +5,7 @@ import { SyncLeaderboardApplication } from '@/application/syncLeaderboardApplica
 import { PollTraderService } from '@/domain/service/pollTraderService';
 import { RecomputeTraderMetricsService } from '@/domain/service/recomputeTraderMetricsService';
 import { SyncLeaderboardService } from '@/domain/service/syncLeaderboardService';
-import type { IHyperliquidProxy } from '@/domain/interface/iHyperliquidProxy';
+import type { ITraderDataProxy } from '@/domain/interface/iTraderDataProxy';
 import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
 import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 import { Scheduler } from '@/infrastructure/scheduler/scheduler';
@@ -15,7 +15,7 @@ import { createMockTraderRepository } from '../../application/support/mockTrader
 
 // 真實 application/service（連帶真實 entity），只 mock 最外層介面。
 const buildScheduler = (deps: {
-  hyperliquidProxy: IHyperliquidProxy;
+  hyperliquidProxy: ITraderDataProxy;
   positionRepository: IPositionRepository;
   traderRepository: ITraderRepository;
   onTraderError: (phase: 'poll' | 'recompute', traderAddress: string, error: Error) => void;
@@ -76,7 +76,7 @@ describe('Scheduler per-trader isolation', () => {
     vi.mocked(traderRepository.saveTraders).mockImplementation(async () => {
       callOrder.push('sync');
     });
-    vi.mocked(hyperliquidProxy.fetchUserFills).mockImplementation(async () => {
+    vi.mocked(hyperliquidProxy.fetchPositionActivities).mockImplementation(async () => {
       callOrder.push('poll');
       return [];
     });
@@ -92,7 +92,7 @@ describe('Scheduler per-trader isolation', () => {
 
     await scheduler.runInitialCycle();
 
-    expect(hyperliquidProxy.fetchUserFills).toHaveBeenCalledWith('A', expect.any(Number));
+    expect(hyperliquidProxy.fetchPositionActivities).toHaveBeenCalledWith('A', expect.any(Number));
     // 順序：sync → poll → recompute。
     expect(callOrder).toEqual(['sync', 'poll', 'recompute']);
   });
@@ -101,7 +101,7 @@ describe('Scheduler per-trader isolation', () => {
     const traderRepository = createMockTraderRepository();
     vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A']);
     const hyperliquidProxy = createMockHyperliquidProxy();
-    vi.mocked(hyperliquidProxy.fetchLeaderboard).mockRejectedValue(new Error('rate limited'));
+    vi.mocked(hyperliquidProxy.fetchTraderList).mockRejectedValue(new Error('rate limited'));
     const scheduler = buildScheduler({
       hyperliquidProxy,
       positionRepository: createMockPositionRepository(),
@@ -110,7 +110,7 @@ describe('Scheduler per-trader isolation', () => {
     });
 
     await expect(scheduler.runInitialCycle()).resolves.toBeUndefined(); // 不中斷啟動
-    expect(hyperliquidProxy.fetchUserFills).not.toHaveBeenCalled();
+    expect(hyperliquidProxy.fetchPositionActivities).not.toHaveBeenCalled();
     expect(traderRepository.saveTraderMetrics).not.toHaveBeenCalled();
   });
 
@@ -118,7 +118,7 @@ describe('Scheduler per-trader isolation', () => {
     const traderRepository = createMockTraderRepository();
     vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A', 'B', 'C']);
     const hyperliquidProxy = createMockHyperliquidProxy();
-    vi.mocked(hyperliquidProxy.fetchUserFills).mockImplementation((traderAddress) =>
+    vi.mocked(hyperliquidProxy.fetchPositionActivities).mockImplementation((traderAddress) =>
       traderAddress === 'B' ? Promise.reject(new Error('rate limited')) : Promise.resolve([]),
     );
     const onTraderError = vi.fn();
@@ -131,7 +131,7 @@ describe('Scheduler per-trader isolation', () => {
 
     await scheduler.pollAllTraders();
 
-    expect(hyperliquidProxy.fetchUserFills).toHaveBeenCalledTimes(3); // A, B, C all attempted
+    expect(hyperliquidProxy.fetchPositionActivities).toHaveBeenCalledTimes(3); // A, B, C all attempted
     expect(onTraderError).toHaveBeenCalledTimes(1);
     expect(onTraderError).toHaveBeenCalledWith('poll', 'B', expect.any(Error));
   });
