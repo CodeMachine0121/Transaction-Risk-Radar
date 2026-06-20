@@ -7,6 +7,7 @@ import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 
 const createMockTraderRepository = (): ITraderRepository => ({
   saveTraders: vi.fn<(traderAddresses: string[]) => Promise<void>>().mockResolvedValue(undefined),
+  findAllAddresses: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
 });
 
 const leaderboardTrader = (address: string) => ({ address, accountValue: new Decimal(1000) });

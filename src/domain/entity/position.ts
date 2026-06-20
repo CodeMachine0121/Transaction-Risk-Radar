@@ -17,6 +17,10 @@ export type PositionProps = {
   snapshots: PositionSnapshot[];
   realizedProfitAndLoss: Decimal;
   closed: boolean;
+  /** 開倉時間（ms）。供 repository 依時間窗把 snapshot 掛回對應倉位。 */
+  openedAt?: number;
+  /** 平倉時間（ms）；仍開倉則為 null。 */
+  closedAt?: number | null;
 };
 
 /**
@@ -41,6 +45,14 @@ export class Position {
 
   isClosed(): boolean {
     return this.props.closed;
+  }
+
+  openedAt(): number {
+    return this.props.openedAt ?? 0;
+  }
+
+  closedAt(): number | null {
+    return this.props.closedAt ?? null;
   }
 
   hasSnapshots(): boolean {
@@ -127,14 +139,26 @@ export class Position {
       let realizedProfitAndLoss = ZERO;
       let running = ZERO;
       let open = false;
+      let openedAt = 0;
+      let closedAt: number | null = null;
 
       const finalize = (closed: boolean): void => {
         coinPositions.push(
-          new Position({ coin, side, events, snapshots: [], realizedProfitAndLoss, closed }),
+          new Position({
+            coin,
+            side,
+            events,
+            snapshots: [],
+            realizedProfitAndLoss,
+            closed,
+            openedAt,
+            closedAt: closed ? closedAt : null,
+          }),
         );
         events = [];
         realizedProfitAndLoss = ZERO;
         open = false;
+        closedAt = null;
       };
 
       for (const fill of ordered) {
@@ -145,13 +169,16 @@ export class Position {
         if (!open) {
           side = after.isPositive() ? 'long' : 'short';
           events.push({ type: 'open', price: fill.price, size: fill.size });
+          openedAt = fill.timestamp;
           open = true;
         } else if (!sameSign(before, after) && !after.isZero()) {
           events.push({ type: 'close', price: fill.price, size: before.abs() });
           realizedProfitAndLoss = realizedProfitAndLoss.plus(fill.closedProfitAndLoss);
+          closedAt = fill.timestamp;
           finalize(true);
           side = after.isPositive() ? 'long' : 'short';
           events.push({ type: 'open', price: fill.price, size: after.abs() });
+          openedAt = fill.timestamp;
           open = true;
         } else if (after.abs().greaterThan(before.abs())) {
           events.push({ type: 'add', price: fill.price, size: fill.size });
@@ -159,6 +186,7 @@ export class Position {
           realizedProfitAndLoss = realizedProfitAndLoss.plus(fill.closedProfitAndLoss);
           if (after.isZero()) {
             events.push({ type: 'close', price: fill.price, size: fill.size });
+            closedAt = fill.timestamp;
             finalize(true);
           } else {
             events.push({ type: 'reduce', price: fill.price, size: fill.size });

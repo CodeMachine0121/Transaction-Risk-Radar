@@ -1,6 +1,9 @@
 // Trader Risk Radar — code-first schema (single source of truth for the data model).
 // 命名遵循 .sdd/UL-MAP.md：model PascalCase、欄位 camelCase，對應 DB 為 snake_case 全名。
 // 金額 / 報酬率一律使用 Decimal，禁用浮點。
+//
+// 持久化模型：存「原始成交（PositionFill）+ 浮虧快照（PositionSnapshot）」，
+// 倉位於讀取時由 domain 的 Position.reconstruct 重建（ingest 無狀態）。
 
 generator client {
   provider = "prisma-client-js"
@@ -8,25 +11,13 @@ generator client {
 
 datasource db {
   // Prisma 7：連線 URL 移至 prisma.config.ts（供 Migrate/CLI），
-  // 執行時透過 @prisma/adapter-pg driver adapter 連線（見 src/infrastructure/persistence）。
+  // 執行時透過 @prisma/adapter-pg driver adapter 連線。
   provider = "postgresql"
 }
 
-enum PositionEventType {
-  open
-  add
-  reduce
-  close
-}
-
-enum PositionStatus {
-  open
-  closed
-}
-
-enum PositionSide {
-  long
-  short
+enum FillSide {
+  buy
+  sell
 }
 
 /// 被追蹤分析的鏈上交易員（錢包地址），來源為 Hyperliquid leaderboard。
@@ -35,61 +26,41 @@ model Trader {
   firstSeenAt DateTime @default(now()) @map("first_seen_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  positions Position[]
-  metrics   TraderMetrics?
+  metrics TraderMetrics?
 
   @@map("traders")
 }
 
-/// 交易員針對某一標的的一筆持倉，具生命週期：開倉 → (加倉/減倉)* → 平倉。
-model Position {
-  id            String         @id @default(uuid())
-  traderAddress String         @map("trader_address")
-  coin          String
-  side          PositionSide
-  status        PositionStatus @default(open)
-  openedAt      DateTime       @map("opened_at")
-  closedAt      DateTime?      @map("closed_at")
+/// 一筆原始成交（userFillsByTime）。以 tradeId 去重 (idempotency)；倉位由此重建。
+model PositionFill {
+  tradeId             BigInt   @id @map("trade_id")
+  traderAddress       String   @map("trader_address")
+  coin                String
+  side                FillSide
+  price               Decimal  @db.Decimal(38, 18)
+  size                Decimal  @db.Decimal(38, 18)
+  startPosition       Decimal  @map("start_position") @db.Decimal(38, 18)
+  direction           String
+  closedProfitAndLoss Decimal  @map("closed_profit_and_loss") @db.Decimal(38, 18)
+  occurredAt          DateTime @map("occurred_at")
+  hash                String
 
-  trader    Trader             @relation(fields: [traderAddress], references: [address])
-  events    PositionEvent[]
-  snapshots PositionSnapshot[]
-
-  @@index([traderAddress])
-  @@map("positions")
+  @@index([traderAddress, coin, occurredAt])
+  @@map("position_fills")
 }
 
-/// 倉位生命週期中的每一個動作（開/加/減/平），是偵測攤平行為的依據。
-model PositionEvent {
-  id          String            @id @default(uuid())
-  positionId  String            @map("position_id")
-  // Hyperliquid 成交唯一識別，用於去重 (idempotency)。
-  fillId      String            @unique @map("fill_id")
-  type        PositionEventType
-  price       Decimal           @db.Decimal(38, 18)
-  size        Decimal           @db.Decimal(38, 18)
-  occurredAt  DateTime          @map("occurred_at")
-
-  position Position @relation(fields: [positionId], references: [id])
-
-  @@index([positionId])
-  @@map("position_events")
-}
-
-/// 每次輪詢對每個開倉拍下的時間切片，是計算 MAE 的依據。
+/// 每次輪詢對開倉拍下的時間切片，依 trader+coin+time 記錄；讀取時依時間窗掛回對應倉位。
 model PositionSnapshot {
   id                                String   @id @default(uuid())
-  positionId                        String   @map("position_id")
+  traderAddress                     String   @map("trader_address")
+  coin                              String
   markPrice                         Decimal  @map("mark_price") @db.Decimal(38, 18)
   unrealizedProfitAndLossPercentage Decimal  @map("unrealized_profit_and_loss_percentage") @db.Decimal(18, 8)
   margin                            Decimal  @db.Decimal(38, 18)
-  // 槓桿來自 poll clearinghouseState（fills 不含槓桿）；averageLeverage = 倉位 snapshots 的槓桿平均。
   leverage                          Decimal  @db.Decimal(18, 4)
   capturedAt                        DateTime @map("captured_at")
 
-  position Position @relation(fields: [positionId], references: [id])
-
-  @@index([positionId, capturedAt])
+  @@index([traderAddress, coin, capturedAt])
   @@map("position_snapshots")
 }
 
