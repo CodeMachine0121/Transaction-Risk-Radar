@@ -56,6 +56,7 @@ export class PollTraderService {
     const entryNotional = position.entryPrice.times(absoluteSize);
     return {
       coin: position.coin,
+      signedSize: position.signedSize, // 保留方向（多/空）供共識聚合；notional/markPrice 仍以絕對值算
       markPrice: absoluteSize.isZero() ? ZERO : position.positionValue.dividedBy(absoluteSize),
       unrealizedProfitAndLossPercentage: entryNotional.isZero()
         ? ZERO

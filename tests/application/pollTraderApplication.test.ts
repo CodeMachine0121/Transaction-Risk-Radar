@@ -20,6 +20,16 @@ const openPosition = (): OpenPosition => ({
   marginUsed: new Decimal(20),
 });
 
+const shortOpenPosition = (): OpenPosition => ({
+  coin: 'BTC',
+  signedSize: new Decimal(-3),
+  entryPrice: new Decimal(100),
+  leverage: new Decimal(5),
+  unrealizedProfitAndLoss: new Decimal(30),
+  positionValue: new Decimal(270),
+  marginUsed: new Decimal(60),
+});
+
 const fill = (): TraderActivity => ({
   coin: 'ETH',
   price: new Decimal(100),
@@ -84,5 +94,23 @@ describe('PollTraderApplication', () => {
     expect(snapshots?.[0]?.unrealizedProfitAndLossPercentage.toString()).toBe('20');
     expect(snapshots?.[0]?.markPrice.toString()).toBe('120');
     expect(snapshots?.[0]?.leverage.toString()).toBe('10');
+  });
+
+  it('retains the signed position size (direction) on the snapshot', async () => {
+    const proxy = createMockHyperliquidProxy();
+    vi.mocked(proxy.fetchOpenPositions).mockResolvedValue([
+      openPosition(), // long, +2
+      shortOpenPosition(), // short, -3
+    ]);
+    const positionRepository = createMockPositionRepository();
+    const application = buildApplication(proxy, positionRepository, {
+      lookbackMilliseconds: 3000,
+    });
+
+    await application.poll('0xA');
+
+    const [, , snapshots] = vi.mocked(positionRepository.saveSnapshots).mock.calls[0] ?? [];
+    expect(snapshots?.[0]?.signedSize.toString()).toBe('2'); // 多單保留正號
+    expect(snapshots?.[1]?.signedSize.toString()).toBe('-3'); // 空單保留負號（不再 .abs()）
   });
 });

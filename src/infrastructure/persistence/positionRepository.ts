@@ -73,6 +73,7 @@ export class PositionRepository implements IPositionRepository {
         provider: toPrismaProvider(provider),
         traderAddress,
         coin: snapshot.coin,
+        signedSize: snapshot.signedSize.toString(),
         markPrice: snapshot.markPrice.toString(),
         unrealizedProfitAndLossPercentage: snapshot.unrealizedProfitAndLossPercentage.toString(),
         margin: snapshot.margin.toString(),
