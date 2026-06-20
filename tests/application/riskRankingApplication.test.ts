@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RiskRankingApplication } from '@/application/riskRankingApplication';
 import { RiskRankingService } from '@/domain/service/riskRankingService';
-import {
-  buildTrader,
-  createMockTraderRepository,
-} from './support/mockTraderRepository';
+import { buildTrader, createMockTraderRepository } from './support/mockTraderRepository';
 
 // 測 application 時注入「真實的 domain service + entity」，只 mock repository 介面。
 describe('RiskRankingApplication', () => {

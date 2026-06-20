@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TraderDetailApplication } from '@/application/traderDetailApplication';
 import { TraderDetailService } from '@/domain/service/traderDetailService';
-import {
-  buildTrader,
-  createMockTraderRepository,
-} from './support/mockTraderRepository';
+import { buildTrader, createMockTraderRepository } from './support/mockTraderRepository';
 
 describe('TraderDetailApplication', () => {
   it('returns the risk DTO for a known trader address', async () => {
