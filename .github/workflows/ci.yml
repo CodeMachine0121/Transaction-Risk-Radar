@@ -8,8 +8,21 @@ on:
 jobs:
   quality-checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: trader_risk_radar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trader_risk_radar"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
-      DATABASE_URL: postgresql://localhost:5432/transaction_risk_radar
+      DATABASE_URL: postgresql://localhost:5432/trader_risk_radar
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
