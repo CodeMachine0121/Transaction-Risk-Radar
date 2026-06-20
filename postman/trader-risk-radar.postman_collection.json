@@ -1,13 +1,14 @@
 {
   "info": {
     "name": "Trader Risk Radar",
-    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。",
+    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n**風險評分分級（tier，每筆回應皆帶）：**\n- `position`：部位級（精準版）——逐筆部位重建，含 MAE/攤平/槓桿等完整指標；唯一會出現在 /rankings 的等級。\n- `account`：帳戶級（粗版 fallback）——當逐筆部位抓不到（如 OKX 私密帶單員回 60004）但來源提供帳戶彙總（累積報酬曲線 + winRatio）時，以「每期報酬下行標準差 + 帳戶回撤 + 陷阱訊號」估算；**排除於 /rankings**，僅在 /traders 顯示。此級別 MAE/averagingDownRatio/averageLeverage/realizedProfitAndLoss 為 null。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。\n- `accountTierAddress`：一個 OKX 帳戶級（tier=account）交易員的 uniqueCode，供示範 fallback。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
     { "key": "provider", "value": "hyperliquid", "type": "string" },
-    { "key": "traderAddress", "value": "0A3CF5287316F730", "type": "string" }
+    { "key": "traderAddress", "value": "0A3CF5287316F730", "type": "string" },
+    { "key": "accountTierAddress", "value": "0A3CF5287316F730", "type": "string" }
   ],
   "item": [
     {
@@ -75,7 +76,42 @@
             { "key": "limit", "value": "20", "description": "回傳筆數上限（整數，預設 50）。" }
           ]
         },
-        "description": "列出某來源全部追蹤交易員（含 insufficientData）。排序：可排行者 riskScore 升冪在前、insufficientData 殿後。"
+        "description": "列出某來源全部追蹤交易員（含 insufficientData）。排序：可排行者 riskScore 升冪在前、insufficientData 殿後。\n每筆回應帶 `tier`（position / account）；OKX 私密帶單員多為 account（粗版 fallback）。"
+      },
+      "response": []
+    },
+    {
+      "name": "List Traders — Account-Tier Fallback (OKX)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/traders?provider=okx&limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["traders"],
+          "query": [
+            { "key": "provider", "value": "okx", "description": "鎖定 OKX——帳戶級 fallback 僅 OKX 適用（Hyperliquid leaderboard 無報酬序列）。" },
+            { "key": "limit", "value": "50", "description": "回傳筆數上限。" }
+          ]
+        },
+        "description": "示範**帳戶級風險 fallback**。逐筆部位抓不到的 OKX 私密帶單員（poll 回 60004）會以帳戶彙總算出 `tier=account` 的粗版 riskScore，出現在這裡但**不**出現在 /rankings。\n\n觀察回應中 `tier=account` 的項目：`riskScore`/`returnDownsideDeviation`/`winRate`/`trapSignal` 有值，`maxAdverseExcursionPercentile90`/`averagingDownRatio`/`averageLeverage`/`realizedProfitAndLoss` 為 null、`closedPositionCount=0`。"
+      },
+      "response": []
+    },
+    {
+      "name": "Trader Detail (account-tier example, OKX)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/traders/{{accountTierAddress}}?provider=okx",
+          "host": ["{{baseUrl}}"],
+          "path": ["traders", "{{accountTierAddress}}"],
+          "query": [
+            { "key": "provider", "value": "okx", "description": "帳戶級 fallback 僅 OKX 適用。" }
+          ]
+        },
+        "description": "單一 OKX 帳戶級（tier=account）交易員的風險詳情。先呼叫上面的「List Traders — Account-Tier Fallback (OKX)」取得一個 `tier=account` 的 uniqueCode，填入 `accountTierAddress` 變數再執行。\n\n回應的粗版指標：`riskScore` = normalize(回撤)×權重 + 陷阱訊號×權重 + normalize(每期報酬下行標準差)×權重；部位級專屬欄位為 null。"
       },
       "response": []
     },
