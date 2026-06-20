@@ -64,6 +64,14 @@ _Records entities, value objects, attributes and their correspondence between co
 | 最大 conviction 佔比 Max Conviction Share | `maxConvictionShare` | — | 某 coin 參與者中最大的單一 positionConvictionShare；高代表該 coin 共識被單一重押者主導。 | Confirmed |
 | 倉位觀測初見時間 First Observed At | `firstObservedAt` | — | 新鮮度窗內某 (trader,coin) 最早的快照 `capturedAt`；供窗內觀測的粗略持倉年齡。精準 openedAt 屬 entry-signal feature。 | Confirmed |
 | 新開倉人數 New Position Count | `newPositionCount` | — | 某 coin 中 `now − firstObservedAt` 落在最近一個輪詢間隔內的參與者數（粗略代理，僅描述、不 gate）。 | Confirmed |
+| 進場訊號 Entry Signal | `entrySignal` | Entry Signal | 由安全群共識導出的**可解釋、分級**進場傾向（決策輔助，非下單指令）。每 coin 一筆，含 lean/setupQuality/verdict/reasons。**experimental，未經回測校準前不可信。** | Confirmed |
+| 方向傾向 Lean | `lean`（enum：`long`/`short`/`neutral`） | Lean | 由 convictionWeightedDirectionBias 號 + directionEpsilon 決定的方向傾向。 | Confirmed |
+| 設置品質 Setup Quality | `setupQuality` | Setup Quality | 0..1 的規則綜合分（以 strength 為基底乘非擁擠/非主導/槓桿折扣）。**非獲利機率。** | Confirmed |
+| 進場判定 Entry Verdict | `entryVerdict`（enum：`worth-considering`/`avoid`/`no-signal`） | Verdict | 規則判定：值得考慮 / 迴避（擁擠/高槓桿，只降級不反向）/ 無訊號（薄樣本、單人主導、方向不明）。 | Confirmed |
+| 共識時序快照 Consensus Snapshot | `consensusSnapshot`（`consensus_snapshots`） | — | 每輪 listConsensus 結果的時序留存（coin/兩種 bias/strength/maxConvictionShare/participantCount/capturedAt），回測輸入。 | Confirmed |
+| 前向報酬 Forward Return | `forwardReturn` | — | 共識點 t 後 horizon h 的價格相對報酬 `(price[t+h]−price[t])/price[t]`；回測命中判定基礎。 | Confirmed |
+| 訊號命中率 Signal Hit Rate | `signalHitRate` | — | 回測中 lean 方向與 forwardReturn 同號的比例（neutral 不計）；衡量規則預測力。 | Confirmed |
+| 評估視窗 Horizon | `horizon` | — | 回測前向評估的時間視窗（預設 1h/4h/1d）。 | Confirmed |
 
 ---
 
@@ -93,6 +101,9 @@ _Records business operations, function logic, and their corresponding business a
 | 查詢安全群共識 Query Safe Cohort Consensus | `getSafeCohortConsensus` (`GET /consensus`) | 使用者呼叫 REST API | 回傳各 coin 的安全群持倉共識，依 `consensusStrength` 排序、分頁 | 描述性、非建議；附免責 |
 | 查詢單一標的共識 Query Coin Consensus | `getCoinConsensus` (`GET /consensus/:coin`) | 使用者呼叫 REST API | 回傳單一 coin 的安全群共識細節 | 404 若無足量共識 |
 | 計算安全群共識 Compute Safe Cohort Consensus | `computeSafeCohortConsensus` | 使用者呼叫時即時聚合 | 取安全群最新且在新鮮度窗內的快照，加權聚合每 coin 的 `netDirectionBias` 等 | 跨多 entity → Domain Service |
+| 評估進場訊號 Evaluate Entry Signals | `evaluateEntrySignals` (`GET /signals`) | 使用者呼叫 REST API | listConsensus 後由 EntrySignalService 將共識化為分級訊號 | opt-in、experimental、重免責；非下單 |
+| 留存共識時序 Snapshot Consensus | `snapshotConsensus` | 背景排程（≈recompute 5min） | 將 listConsensus 結果寫入 consensus_snapshots | 回測輸入 |
+| 回測評估 Backtest Evaluate | `backtestEvaluate` | 離線 job（非 HTTP） | 由歷史共識序列 + 前向價格算 forwardReturn/signalHitRate | 純 domain、可注入價格、產校準依據 |
 
 ---
 
