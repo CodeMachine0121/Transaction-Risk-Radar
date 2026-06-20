@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient, TraderMetrics as TraderMetricsRow } from '@prisma/client';
 import { Trader } from '../../domain/entity/trader';
+import { Provider } from '../../domain/vo/provider';
 import type { ITraderRepository } from '../../domain/interface/iTraderRepository';
 import type { TraderMetrics } from '../../domain/vo/traderMetrics';
 
@@ -23,7 +24,7 @@ const toTrader = (row: TraderMetricsRow): Trader => {
     closedPositionCount: row.closedPositionCount,
     insufficientData: row.insufficientData,
   };
-  return Trader.fromStoredMetrics(row.traderAddress, metrics);
+  return Trader.fromStoredMetrics(Provider.Hyperliquid, row.traderAddress, metrics);
 };
 
 /** Repository（Trader entity）：以 Prisma 管理追蹤名單與 trader_metrics 的讀寫。 */

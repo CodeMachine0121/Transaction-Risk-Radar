@@ -1,5 +1,6 @@
 import type { TraderRiskDto } from '../dto/traderRiskDto';
 import { Trader } from '../entity/trader';
+import { Provider } from '../vo/provider';
 import type { IPositionRepository } from '../interface/iPositionRepository';
 import type { ITraderRepository } from '../interface/iTraderRepository';
 
@@ -15,7 +16,7 @@ export class RecomputeTraderMetricsService {
 
   async recompute(traderAddress: string): Promise<TraderRiskDto> {
     const positions = await this.positionRepository.findPositions(traderAddress);
-    const trader = Trader.reconstruct(traderAddress, positions);
+    const trader = Trader.reconstruct(Provider.Hyperliquid, traderAddress, positions);
     await this.traderRepository.saveTraderMetrics(trader);
     return trader.toRiskDto();
   }

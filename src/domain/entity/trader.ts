@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import type { TraderRiskDto } from '../dto/traderRiskDto';
 import type { TraderMetrics } from '../vo/traderMetrics';
+import type { Provider } from '../vo/provider';
 import { DEFAULT_RISK_SCORE_WEIGHTS, type RiskScoreWeights } from '../vo/riskScoreWeights';
 import type { Position } from './position';
 
@@ -30,19 +31,26 @@ export type TraderReconstructOptions = {
  * 兩者都化為統一的 TraderMetrics 內部表示，方法一致回傳。
  */
 export class Trader {
+  private readonly traderProvider: Provider;
   private readonly traderAddress: string;
   private readonly metrics: TraderMetrics;
 
-  private constructor(traderAddress: string, metrics: TraderMetrics) {
+  private constructor(provider: Provider, traderAddress: string, metrics: TraderMetrics) {
+    this.traderProvider = provider;
     this.traderAddress = traderAddress;
     this.metrics = metrics;
   }
 
-  static fromStoredMetrics(traderAddress: string, metrics: TraderMetrics): Trader {
-    return new Trader(traderAddress, metrics);
+  static fromStoredMetrics(
+    provider: Provider,
+    traderAddress: string,
+    metrics: TraderMetrics,
+  ): Trader {
+    return new Trader(provider, traderAddress, metrics);
   }
 
   static reconstruct(
+    provider: Provider,
     traderAddress: string,
     positions: Position[],
     options: TraderReconstructOptions = {},
@@ -68,7 +76,7 @@ export class Trader {
     const closedPositionCount = closed.length;
 
     if (closedPositionCount < minimumClosedPositions) {
-      return new Trader(traderAddress, {
+      return new Trader(provider, traderAddress, {
         maxAdverseExcursionPercentile90: null,
         averagingDownRatio: null,
         winRate: null,
@@ -157,7 +165,7 @@ export class Trader {
       .plus(normalize(averageLeverage, AVERAGE_LEVERAGE_CAP).times(weights.leverage))
       .times(HUNDRED);
 
-    return new Trader(traderAddress, {
+    return new Trader(provider, traderAddress, {
       maxAdverseExcursionPercentile90,
       averagingDownRatio,
       winRate,
@@ -169,6 +177,10 @@ export class Trader {
       closedPositionCount,
       insufficientData: false,
     });
+  }
+
+  provider(): Provider {
+    return this.traderProvider;
   }
 
   address(): string {
@@ -192,6 +204,7 @@ export class Trader {
     const asText = (value: Decimal | null): string | null =>
       value === null ? null : value.toString();
     return {
+      provider: this.traderProvider,
       traderAddress: this.traderAddress,
       insufficientData: this.metrics.insufficientData,
       closedPositionCount: this.metrics.closedPositionCount,

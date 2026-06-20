@@ -2,10 +2,15 @@ import Decimal from 'decimal.js';
 import { vi } from 'vitest';
 import { Trader } from '@/domain/entity/trader';
 import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
+import { Provider } from '@/domain/vo/provider';
 
 /** 測試資料工廠：以 stored metrics hydrate 出一個 Trader（給定 riskScore）。 */
-export const buildTrader = (traderAddress: string, riskScore: number | null): Trader =>
-  Trader.fromStoredMetrics(traderAddress, {
+export const buildTrader = (
+  traderAddress: string,
+  riskScore: number | null,
+  provider: Provider = Provider.Hyperliquid,
+): Trader =>
+  Trader.fromStoredMetrics(provider, traderAddress, {
     maxAdverseExcursionPercentile90: null,
     averagingDownRatio: null,
     winRate: null,

@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
 import { Position } from '@/domain/entity/position';
 import { Trader } from '@/domain/entity/trader';
+import { Provider } from '@/domain/vo/provider';
 import type { PositionLifecycleEvent } from '@/domain/vo/positionLifecycleEvent';
 import type { PositionSnapshot } from '@/domain/vo/positionSnapshot';
 import type { TraderMetrics } from '@/domain/vo/traderMetrics';
@@ -27,7 +28,7 @@ describe('Trader.reconstruct', () => {
       realizedProfitAndLoss: new Decimal(5),
       closed: true,
     });
-    const trader = Trader.reconstruct('0xA', [position]); // default minimum 20
+    const trader = Trader.reconstruct(Provider.Hyperliquid, '0xA', [position]); // default minimum 20
 
     expect(trader.isInsufficientData()).toBe(true);
     expect(trader.riskScore()).toBeNull();
@@ -49,7 +50,7 @@ describe('Trader.reconstruct', () => {
       realizedProfitAndLoss: new Decimal(19),
       closed: true,
     });
-    const trader = Trader.reconstruct('0xA', [position], { minimumClosedPositions: 1 });
+    const trader = Trader.reconstruct(Provider.Hyperliquid, '0xA', [position], { minimumClosedPositions: 1 });
     const dto = trader.toRiskDto();
 
     expect(trader.isInsufficientData()).toBe(false);
@@ -77,7 +78,7 @@ describe('Trader.reconstruct', () => {
       realizedProfitAndLoss: new Decimal(10),
       closed: true,
     });
-    const trader = Trader.reconstruct('0xA', [withSnapshot, withoutSnapshot], {
+    const trader = Trader.reconstruct(Provider.Hyperliquid, '0xA', [withSnapshot, withoutSnapshot], {
       minimumClosedPositions: 1,
     });
     expect(trader.toRiskDto().closedPositionCount).toBe(1);
@@ -106,7 +107,7 @@ describe('Trader.reconstruct', () => {
       openedAt: asOf - 201 * day,
       closedAt: asOf - 200 * day,
     });
-    const trader = Trader.reconstruct('0xA', [recentWin, staleLoss], {
+    const trader = Trader.reconstruct(Provider.Hyperliquid, '0xA', [recentWin, staleLoss], {
       minimumClosedPositions: 1,
       asOf,
     });
@@ -130,7 +131,7 @@ describe('Trader.reconstruct', () => {
         openedAt: asOf - 201 * day,
         closedAt: asOf - 200 * day,
       });
-    const trader = Trader.reconstruct('0xA', [staleClosed('ETH'), staleClosed('BTC')], {
+    const trader = Trader.reconstruct(Provider.Hyperliquid, '0xA', [staleClosed('ETH'), staleClosed('BTC')], {
       minimumClosedPositions: 1,
       asOf,
     });
@@ -154,10 +155,29 @@ describe('Trader.fromStoredMetrics', () => {
       closedPositionCount: 30,
       insufficientData: false,
     };
-    const trader = Trader.fromStoredMetrics('0xB', metrics);
+    const trader = Trader.fromStoredMetrics(Provider.Hyperliquid, '0xB', metrics);
 
     expect(trader.riskScore()?.toString()).toBe('68.5');
     expect(trader.toRiskDto().traderAddress).toBe('0xB');
     expect(trader.toRiskDto().winRate).toBe('1');
+  });
+
+  it('carries the provider through to the DTO', () => {
+    const metrics: TraderMetrics = {
+      maxAdverseExcursionPercentile90: null,
+      averagingDownRatio: null,
+      winRate: null,
+      realizedProfitAndLoss: null,
+      returnDownsideDeviation: null,
+      averageLeverage: null,
+      trapSignal: null,
+      riskScore: null,
+      closedPositionCount: 0,
+      insufficientData: true,
+    };
+    const trader = Trader.fromStoredMetrics(Provider.Hyperliquid, '0xB', metrics);
+
+    expect(trader.toRiskDto().provider).toBe('hyperliquid');
+    expect(trader.toRiskDto().traderAddress).toBe('0xB');
   });
 });
