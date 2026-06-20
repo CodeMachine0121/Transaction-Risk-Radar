@@ -1,5 +1,7 @@
+import Decimal from 'decimal.js';
 import { describe, expect, it, vi } from 'vitest';
 import { ListTradersApplication } from '@/application/listTradersApplication';
+import { Trader } from '@/domain/entity/trader';
 import { TraderListService } from '@/domain/service/traderListService';
 import { Provider } from '@/domain/vo/provider';
 import { buildTrader, createMockTraderRepository } from './support/mockTraderRepository';
@@ -32,6 +34,21 @@ describe('ListTradersApplication', () => {
     const list = await application.list({});
 
     expect(list.map((dto) => dto.traderAddress)).toEqual(['B', 'A', 'I']);
+  });
+
+  it('exposes the risk-score tier so account-level (coarse) traders are distinguishable', async () => {
+    const repository = createMockTraderRepository();
+    const accountTrader = Trader.fromAccountStats(Provider.Okx, 'ACC', {
+      winRatio: new Decimal('0.6'),
+      returnSeries: [new Decimal('10'), new Decimal('-20'), new Decimal('5')],
+    });
+    vi.mocked(repository.findAllTraders).mockResolvedValue([buildTrader('POS', 70), accountTrader]);
+    const application = new ListTradersApplication(new TraderListService(repository));
+
+    const list = await application.list({});
+
+    expect(list.find((dto) => dto.traderAddress === 'POS')?.tier).toBe('position');
+    expect(list.find((dto) => dto.traderAddress === 'ACC')?.tier).toBe('account');
   });
 
   it('applies the provider filter and pagination', async () => {
