@@ -12,12 +12,37 @@ export const defaultRequestWeights = {
   userFillsByTime: 20,
 } as const;
 
+export type BackoffOptions = {
+  /** 429 後的最大重試次數。 */
+  maximumRetryCount: number;
+  /** exponential backoff 基數毫秒。 */
+  baseDelayMilliseconds: number;
+  /** backoff 上限毫秒。 */
+  maximumDelayMilliseconds: number;
+};
+
+const defaultBackoff: BackoffOptions = {
+  maximumRetryCount: 5,
+  baseDelayMilliseconds: 500,
+  maximumDelayMilliseconds: 30000,
+};
+
+/** jitter 佔 exponential delay 的比例（± 由 random 決定，0 → 無 jitter）。 */
+const jitterRatio = 0.2;
+const tooManyRequestsStatus = 429;
+
+const defaultSleep = (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 export type HyperliquidProxyOptions = {
   infoApiBaseUrl: string;
   statsDataBaseUrl: string;
   fetchFunction?: typeof fetch;
   /** weight 限流器；未注入則不限流（leaderboard 不計 weight，亦走此路徑但不取 token）。 */
   requestWeightLimiter?: RequestWeightLimiter;
+  backoff?: BackoffOptions;
+  sleep?: (milliseconds: number) => Promise<void>;
+  random?: () => number;
 };
 
 /** 以 HTTP 呼叫 Hyperliquid 公開讀取 API，並正規化為 domain 使用的型別。 */
@@ -26,16 +51,22 @@ export class HyperliquidProxy implements IHyperliquidProxy {
   private readonly statsDataBaseUrl: string;
   private readonly fetchFunction: typeof fetch;
   private readonly requestWeightLimiter: RequestWeightLimiter | undefined;
+  private readonly backoff: BackoffOptions;
+  private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly random: () => number;
 
   constructor(options: HyperliquidProxyOptions) {
     this.infoApiBaseUrl = options.infoApiBaseUrl;
     this.statsDataBaseUrl = options.statsDataBaseUrl;
     this.fetchFunction = options.fetchFunction ?? globalThis.fetch;
     this.requestWeightLimiter = options.requestWeightLimiter;
+    this.backoff = options.backoff ?? defaultBackoff;
+    this.sleep = options.sleep ?? defaultSleep;
+    this.random = options.random ?? Math.random;
   }
 
   async fetchLeaderboard(): Promise<LeaderboardTrader[]> {
-    const response = await this.fetchFunction(`${this.statsDataBaseUrl}/Mainnet/leaderboard`);
+    const response = await this.fetchWithRetry(`${this.statsDataBaseUrl}/Mainnet/leaderboard`);
     if (!response.ok) {
       throw new Error(`Hyperliquid leaderboard request failed with status ${response.status}`);
     }
@@ -89,18 +120,54 @@ export class HyperliquidProxy implements IHyperliquidProxy {
   }
 
   private async postInfo<TResponse>(requestBody: object, weight: number): Promise<TResponse> {
-    if (this.requestWeightLimiter !== undefined) {
-      await this.requestWeightLimiter.acquire(weight);
-    }
-    const response = await this.fetchFunction(`${this.infoApiBaseUrl}/info`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
+    const response = await this.fetchWithRetry(
+      `${this.infoApiBaseUrl}/info`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      },
+      weight,
+    );
     if (!response.ok) {
       throw new Error(`Hyperliquid info request failed with status ${response.status}`);
     }
     const data = (await response.json()) as TResponse;
     return data;
+  }
+
+  /**
+   * 限流（依 weight，未提供則不計）後送出請求；遇 429 依 Retry-After / exponential
+   * backoff + jitter 重試，至上限為止。非 429 的回應（含其他非 ok）直接回傳交由呼叫端處理。
+   */
+  private async fetchWithRetry(
+    url: string,
+    requestInit?: RequestInit,
+    weight?: number,
+  ): Promise<Response> {
+    let attempt = 0;
+    for (;;) {
+      if (weight !== undefined && this.requestWeightLimiter !== undefined) {
+        await this.requestWeightLimiter.acquire(weight);
+      }
+      const response = await this.fetchFunction(url, requestInit);
+      if (response.status !== tooManyRequestsStatus || attempt >= this.backoff.maximumRetryCount) {
+        return response;
+      }
+      await this.sleep(this.retryDelayMilliseconds(response, attempt));
+      attempt += 1;
+    }
+  }
+
+  private retryDelayMilliseconds(response: Response, attempt: number): number {
+    const retryAfter = Number(response.headers.get('retry-after'));
+    if (Number.isFinite(retryAfter) && retryAfter > 0) {
+      return retryAfter * 1000;
+    }
+    const exponential = Math.min(
+      this.backoff.baseDelayMilliseconds * 2 ** attempt,
+      this.backoff.maximumDelayMilliseconds,
+    );
+    return Math.round(exponential * (1 + jitterRatio * this.random()));
   }
 }

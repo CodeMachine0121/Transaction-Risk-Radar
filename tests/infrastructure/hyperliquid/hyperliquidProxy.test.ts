@@ -31,7 +31,7 @@ describe('HyperliquidProxy', () => {
 
     const traders = await buildProxy(fetchMock).fetchLeaderboard();
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://stats-data.hyperliquid.xyz/Mainnet/leaderboard',
     );
     expect(traders).toHaveLength(2);
@@ -156,6 +156,123 @@ describe('HyperliquidProxy', () => {
 
     await proxy.fetchLeaderboard();
 
+    expect(acquireSpy).not.toHaveBeenCalled();
+  });
+});
+
+const tooManyRequests = (headers: Record<string, string> = {}): Response =>
+  new Response('', { status: 429, headers });
+
+type BackoffTestOptions = {
+  fetchFunction: typeof fetch;
+  sleep?: (milliseconds: number) => Promise<void>;
+  random?: () => number;
+  backoff?: {
+    maximumRetryCount: number;
+    baseDelayMilliseconds: number;
+    maximumDelayMilliseconds: number;
+  };
+  requestWeightLimiter?: RequestWeightLimiter;
+};
+
+const buildBackoffProxy = (options: BackoffTestOptions): HyperliquidProxy =>
+  new HyperliquidProxy({
+    infoApiBaseUrl: 'https://api.hyperliquid.xyz',
+    statsDataBaseUrl: 'https://stats-data.hyperliquid.xyz',
+    fetchFunction: options.fetchFunction,
+    sleep: options.sleep,
+    random: options.random,
+    backoff: options.backoff,
+    requestWeightLimiter: options.requestWeightLimiter,
+  });
+
+describe('HyperliquidProxy 429 backoff', () => {
+  it('retries on 429 then returns the successful response', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(tooManyRequests())
+      .mockResolvedValueOnce(jsonResponse({ assetPositions: [] }));
+    const proxy = buildBackoffProxy({ fetchFunction: fetchMock, sleep: vi.fn() });
+
+    const positions = await proxy.fetchOpenPositions('0xabc');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(positions).toEqual([]);
+  });
+
+  it('waits for the Retry-After header duration', async () => {
+    const sleep = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(tooManyRequests({ 'retry-after': '3' }))
+      .mockResolvedValueOnce(jsonResponse({ assetPositions: [] }));
+    const proxy = buildBackoffProxy({ fetchFunction: fetchMock, sleep });
+
+    await proxy.fetchOpenPositions('0xabc');
+
+    expect(sleep).toHaveBeenCalledWith(3000);
+  });
+
+  it('uses exponential backoff with jitter when no Retry-After header is present', async () => {
+    const sleep = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(tooManyRequests())
+      .mockResolvedValueOnce(tooManyRequests())
+      .mockResolvedValueOnce(jsonResponse({ assetPositions: [] }));
+    const proxy = buildBackoffProxy({
+      fetchFunction: fetchMock,
+      sleep,
+      random: () => 1, // jitter 取最大：delay = exponential × (1 + 0.2)
+      backoff: { maximumRetryCount: 5, baseDelayMilliseconds: 500, maximumDelayMilliseconds: 30000 },
+    });
+
+    await proxy.fetchOpenPositions('0xabc');
+
+    // attempt 0: 500×1.2=600；attempt 1: 1000×1.2=1200
+    expect(sleep.mock.calls).toEqual([[600], [1200]]);
+  });
+
+  it('throws after exceeding the maximum retry count', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(tooManyRequests());
+    const proxy = buildBackoffProxy({
+      fetchFunction: fetchMock,
+      sleep: vi.fn(),
+      backoff: { maximumRetryCount: 2, baseDelayMilliseconds: 500, maximumDelayMilliseconds: 30000 },
+    });
+
+    await expect(proxy.fetchOpenPositions('0xabc')).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(3); // 初次 + 2 retries
+  });
+
+  it('throws immediately on a non-429 error without retrying', async () => {
+    const sleep = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('error', { status: 500 }));
+    const proxy = buildBackoffProxy({ fetchFunction: fetchMock, sleep });
+
+    await expect(proxy.fetchOpenPositions('0xabc')).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('retries the leaderboard on 429 without consuming weight', async () => {
+    const limiter = buildLimiter();
+    const acquireSpy = vi.spyOn(limiter, 'acquire');
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(tooManyRequests())
+      .mockResolvedValueOnce(jsonResponse({ leaderboardRows: [] }));
+    const proxy = buildBackoffProxy({
+      fetchFunction: fetchMock,
+      sleep: vi.fn(),
+      requestWeightLimiter: limiter,
+    });
+
+    await proxy.fetchLeaderboard();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(acquireSpy).not.toHaveBeenCalled();
   });
 });
