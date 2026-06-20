@@ -81,6 +81,8 @@ domain **只依「種類」分這五個資料夾**，不出現 `market` / `assem
 
   `Service` 後綴僅用於跨 entity 的編排（取資料、轉 DTO、多 entity 運算）；單一 entity 的計算放 entity 自己的方法（不另立 service 或 helper）。
 
+- **一個 entity 對應一個 repository**：`Trader` → `TraderRepository`、`Position` → `PositionRepository`。該 entity 的所有持久化（讀 + 寫）都在它的 repository，不另立 `*Writer` / `*MetricsRepository` 等切片類別。
+
 - **資料物件命名**（domain model 只有 entity 與 dto 兩種）：
   | 類別 | 規則 |
   | :--- | :--- |
