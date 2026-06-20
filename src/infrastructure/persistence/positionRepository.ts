@@ -6,6 +6,7 @@ import type {
 } from '@prisma/client';
 import { Position } from '../../domain/entity/position';
 import type { IPositionRepository } from '../../domain/interface/iPositionRepository';
+import type { CurrentOpenPosition } from '../../domain/vo/currentOpenPosition';
 import type { PositionSnapshot } from '../../domain/vo/positionSnapshot';
 import type { PositionSnapshotRecord } from '../../domain/vo/positionSnapshotRecord';
 import { Provider } from '../../domain/vo/provider';
@@ -81,6 +82,46 @@ export class PositionRepository implements IPositionRepository {
         capturedAt,
       })),
     });
+  }
+
+  async findCurrentOpenPositions(
+    provider: Provider,
+    traderAddresses: string[],
+    freshAfter: number,
+  ): Promise<CurrentOpenPosition[]> {
+    if (traderAddresses.length === 0) {
+      return [];
+    }
+    const rows = await this.prismaClient.positionSnapshot.findMany({
+      where: {
+        provider: toPrismaProvider(provider),
+        traderAddress: { in: traderAddresses },
+        capturedAt: { gte: new Date(freshAfter) },
+      },
+      orderBy: { capturedAt: 'desc' },
+    });
+    // rows 依 capturedAt 遞減：每個 (traderAddress, coin) 首見即最新；已平倉（signedSize=0）排除。
+    const seen = new Set<string>();
+    const current: CurrentOpenPosition[] = [];
+    for (const row of rows) {
+      const key = `${row.traderAddress}:${row.coin}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      const signedSize = new Decimal(row.signedSize.toString());
+      if (signedSize.isZero()) {
+        continue;
+      }
+      current.push({
+        traderAddress: row.traderAddress,
+        coin: row.coin,
+        signedSize,
+        leverage: new Decimal(row.leverage.toString()),
+        capturedAt: row.capturedAt.getTime(),
+      });
+    }
+    return current;
   }
 
   async latestActivityTimestamp(provider: Provider, traderAddress: string): Promise<number | null> {
