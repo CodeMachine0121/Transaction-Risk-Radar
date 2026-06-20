@@ -56,6 +56,14 @@ _Records entities, value objects, attributes and their correspondence between co
 | 最小共識人數 Minimum Consensus Participants | `minimumConsensusParticipants` | — | 某 coin 至少需幾位安全交易員才輸出共識（可設定，v1 預設 3），避免單人「共識」。 | Confirmed |
 | 共識新鮮度窗 Consensus Freshness Window | `consensusFreshnessWindow` | — | 快照須落在此窗內才算「當前持倉」（可設定，v1 預設 `2 × POLL_INTERVAL_MS`）；逾窗視為非當前。 | Confirmed |
 | 快照帶號持倉量 Snapshot Signed Size | `signedSize`（於 `position_snapshots`） | — | 快照保留的帶號持倉量（正=多、負=空），供「當前未平倉方向」判定；`pollTrader` 不再取絕對值。 | Confirmed |
+| 倉位名目價值 Position Notional | `positionNotional` | — | 單一當前持倉的名目價值 = `\|signedSize\| × markPrice`（取自 snapshot）。conviction 加權的基礎。 | Confirmed |
+| 倉位 conviction 佔比 Position Conviction Share | `positionConvictionShare` | — | 該倉位 notional 佔該交易員當前所有持倉 notional 總和的比例。重押少數 coin 者高、分散巨鯨低。 | Confirmed |
+| conviction 加權方向偏向 Conviction-Weighted Direction Bias | `convictionWeightedDirectionBias` | Conviction Bias | `Σ(side × convictionWeight)/Σ(convictionWeight)`，−1…+1；`convictionWeight = (1−riskScore/100) × positionConvictionShare`。 | Confirmed |
+| 加權法 Weighting | `weighting`（enum：`equal`/`conviction`） | — | 共識的投票加權法：`equal`=每人一票（僅 inverse-riskScore，既有）；`conviction`=再乘 positionConvictionShare（預設）。決定 consensusStrength/排序的 lens。 | Confirmed |
+| 平均 conviction 佔比 Average Conviction Share | `averageConvictionShare` | — | 某 coin 參與者 positionConvictionShare 的平均；低代表參與者多為分散書。 | Confirmed |
+| 最大 conviction 佔比 Max Conviction Share | `maxConvictionShare` | — | 某 coin 參與者中最大的單一 positionConvictionShare；高代表該 coin 共識被單一重押者主導。 | Confirmed |
+| 倉位觀測初見時間 First Observed At | `firstObservedAt` | — | 新鮮度窗內某 (trader,coin) 最早的快照 `capturedAt`；供窗內觀測的粗略持倉年齡。精準 openedAt 屬 entry-signal feature。 | Confirmed |
+| 新開倉人數 New Position Count | `newPositionCount` | — | 某 coin 中 `now − firstObservedAt` 落在最近一個輪詢間隔內的參與者數（粗略代理，僅描述、不 gate）。 | Confirmed |
 
 ---
 
