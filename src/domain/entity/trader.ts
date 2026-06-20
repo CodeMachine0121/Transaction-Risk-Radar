@@ -172,7 +172,8 @@ export class Trader {
   }
 
   toRiskDto(): TraderRiskDto {
-    const asText = (value: Decimal | null): string | null => (value === null ? null : value.toString());
+    const asText = (value: Decimal | null): string | null =>
+      value === null ? null : value.toString();
     return {
       traderAddress: this.traderAddress,
       insufficientData: this.metrics.insufficientData,
