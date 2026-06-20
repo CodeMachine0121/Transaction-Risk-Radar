@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import Decimal from 'decimal.js';
 import { buildServer } from '@/server';
+import type { EntrySignalReportDto } from '@/domain/dto/entrySignalReportDto';
 import type { SafeCohortConsensusDto } from '@/domain/dto/safeCohortConsensusDto';
 import type { TraderRiskDto } from '@/domain/dto/traderRiskDto';
 import type { CurrentOpenPosition } from '@/domain/vo/currentOpenPosition';
@@ -201,6 +202,40 @@ describe('HTTP API', () => {
     server = buildServer(createMockTraderRepository(), createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/consensus?weighting=bogus' });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('GET /signals returns experimental entry signals with a disclaimer', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findRankableTraders).mockResolvedValue(
+      ['t1', 't2', 't3', 't4', 't5'].map((address) => buildTrader(address, 0)),
+    );
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findCurrentOpenPositions).mockResolvedValue([
+      currentPosition('t1', 'BTC', 1),
+      currentPosition('t2', 'BTC', 1),
+      currentPosition('t3', 'BTC', 1),
+      currentPosition('t4', 'BTC', 1),
+      currentPosition('t5', 'BTC', -1), // 4 多 1 空 → worth-considering long
+    ]);
+    server = buildServer(repository, positionRepository);
+
+    const response = await server.inject({ method: 'GET', url: '/signals' });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<EntrySignalReportDto>();
+    expect(body.experimental).toBe(true);
+    expect(body.disclaimer.length).toBeGreaterThan(0);
+    const btc = body.signals.find((signal) => signal.coin === 'BTC');
+    expect(btc?.lean).toBe('long');
+    expect(btc?.verdict).toBe('worth-considering');
+  });
+
+  it('GET /signals rejects an unknown weighting with 400', async () => {
+    server = buildServer(createMockTraderRepository(), createMockPositionRepository());
+
+    const response = await server.inject({ method: 'GET', url: '/signals?weighting=bogus' });
 
     expect(response.statusCode).toBe(400);
   });
