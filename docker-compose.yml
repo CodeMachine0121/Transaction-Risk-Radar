@@ -85,6 +85,17 @@ services:
       POLL_INTERVAL_MS: '30000'
       RECOMPUTE_INTERVAL_MS: '300000'
       POLL_LOOKBACK_MS: '7776000000'
+      # Hyperliquid /info 限流（per-IP weight 預算）
+      REQUEST_WEIGHT_BUDGET: '1200'
+      REQUEST_WEIGHT_INTERVAL_MS: '60000'
+      # 429 退避（Retry-After 優先，否則 exponential backoff + jitter）
+      BACKOFF_MAXIMUM_RETRY_COUNT: '5'
+      BACKOFF_BASE_DELAY_MS: '500'
+      BACKOFF_MAXIMUM_DELAY_MS: '30000'
+      # OKX copytrading 公開 API（免金鑰）+ 限流
+      OKX_API_BASE_URL: https://www.okx.com
+      OKX_REQUEST_BUDGET: '10'
+      OKX_REQUEST_INTERVAL_MS: '2000'
     depends_on:
       postgres:
         condition: service_healthy

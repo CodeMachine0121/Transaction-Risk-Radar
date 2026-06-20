@@ -1,20 +1,13 @@
 {
   "info": {
     "name": "Trader Risk Radar",
-    "description": "Hyperliquid 交易員風險分析 + 排行 REST API。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `traderAddress`：查詢交易員詳情用的鏈上地址（請替換為 /rankings 回傳的實際 address）",
+    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:3000",
-      "type": "string"
-    },
-    {
-      "key": "traderAddress",
-      "value": "0x0000000000000000000000000000000000000000",
-      "type": "string"
-    }
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "provider", "value": "hyperliquid", "type": "string" },
+    { "key": "traderAddress", "value": "0A3CF5287316F730", "type": "string" }
   ],
   "item": [
     {
@@ -22,57 +15,67 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/health",
-          "host": ["{{baseUrl}}"],
-          "path": ["health"]
-        },
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
         "description": "存活檢查。回傳 {\"status\":\"ok\"}。"
       },
       "response": []
     },
     {
-      "name": "Risk Ranking",
+      "name": "Risk Ranking (defaults)",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/rankings?direction=descending&offset=0&limit=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["rankings"],
-          "query": [
-            {
-              "key": "direction",
-              "value": "descending",
-              "description": "排序方向：descending（riskScore 高→低，預設）或 ascending。"
-            },
-            {
-              "key": "offset",
-              "value": "0",
-              "description": "分頁起始位移（整數）。"
-            },
-            {
-              "key": "limit",
-              "value": "20",
-              "description": "回傳筆數上限（整數）。"
-            }
-          ]
-        },
-        "description": "風險導向排行（US-01）。riskScore 衡量「跟單有多危險」，預設由高風險往低排。三個 query 皆為選用。"
+        "url": { "raw": "{{baseUrl}}/rankings", "host": ["{{baseUrl}}"], "path": ["rankings"] },
+        "description": "風險導向排行（US-01）。只回「可排行」交易員（insufficientData=false）。\n預設由 riskScore 低到高（安全在前）；不帶 query 用伺服器預設。"
       },
       "response": []
     },
     {
-      "name": "Risk Ranking (defaults, no query)",
+      "name": "Risk Ranking (filtered)",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/rankings",
+          "raw": "{{baseUrl}}/rankings?provider=hyperliquid&direction=descending&offset=0&limit=20",
           "host": ["{{baseUrl}}"],
-          "path": ["rankings"]
+          "path": ["rankings"],
+          "query": [
+            { "key": "provider", "value": "hyperliquid", "description": "來源篩選：hyperliquid / okx。缺漏則回全部來源。" },
+            { "key": "direction", "value": "descending", "description": "排序方向：ascending（安全在前，預設）或 descending（高危在前/黑名單）。" },
+            { "key": "offset", "value": "0", "description": "分頁起始位移（整數）。" },
+            { "key": "limit", "value": "20", "description": "回傳筆數上限（整數，預設 50）。" }
+          ]
         },
-        "description": "不帶任何 query，使用伺服器預設排序與分頁。"
+        "description": "可排行交易員排行，含來源篩選、排序與分頁。query 皆為選用。"
+      },
+      "response": []
+    },
+    {
+      "name": "List Traders (all)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/traders", "host": ["{{baseUrl}}"], "path": ["traders"] },
+        "description": "列出**全部**追蹤交易員，**含 insufficientData（尚未可排行）者**——補 /rankings 只回可排行者的可視性缺口。可看 closedPositionCount 累積進度。"
+      },
+      "response": []
+    },
+    {
+      "name": "List Traders (by provider + paging)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/traders?provider=okx&offset=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["traders"],
+          "query": [
+            { "key": "provider", "value": "okx", "description": "來源篩選：hyperliquid / okx。缺漏則回全部。" },
+            { "key": "offset", "value": "0", "description": "分頁起始位移（整數）。" },
+            { "key": "limit", "value": "20", "description": "回傳筆數上限（整數，預設 50）。" }
+          ]
+        },
+        "description": "列出某來源全部追蹤交易員（含 insufficientData）。排序：可排行者 riskScore 升冪在前、insufficientData 殿後。"
       },
       "response": []
     },
@@ -82,11 +85,14 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/traders/{{traderAddress}}",
+          "raw": "{{baseUrl}}/traders/{{traderAddress}}?provider={{provider}}",
           "host": ["{{baseUrl}}"],
-          "path": ["traders", "{{traderAddress}}"]
+          "path": ["traders", "{{traderAddress}}"],
+          "query": [
+            { "key": "provider", "value": "{{provider}}", "description": "來源（hyperliquid / okx）；缺漏預設 hyperliquid。" }
+          ]
         },
-        "description": "單一交易員風險詳情（US-02）。查無此交易員時回 404 {\"error\":\"trader not found\"}。\n\n先呼叫 Risk Ranking 取得實際 address，再把它填入 collection 變數 traderAddress。"
+        "description": "單一交易員風險詳情（US-02）。以 (provider, address) 定位；查無回 404 {\"error\":\"trader not found\"}。\n先呼叫 List Traders / Risk Ranking 取得實際 (provider, address)。"
       },
       "response": []
     }
