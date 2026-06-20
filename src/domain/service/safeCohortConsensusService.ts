@@ -8,21 +8,30 @@ import type { Provider } from '../vo/provider';
 import type { SafeCohortConsensusQuery } from '../vo/safeCohortConsensusQuery';
 
 const ZERO = new Decimal(0);
+const ONE = new Decimal(1);
 const DEFAULT_MAX_RISK_SCORE = new Decimal(40);
 const DEFAULT_MINIMUM_CONSENSUS_PARTICIPANTS = 3;
 const DEFAULT_LIMIT = 50;
 const DISCLAIMER =
   '本資料為「安全群」當前持倉的描述性共識，非投資建議、亦非價格預測。鏈上永續為負和遊戲，方向一致不代表會獲利，請勿據此重壓。';
 
-/** 安全群於某 coin 的單筆投票（方向 + 權重 + 槓桿）。 */
-type Contribution = { coin: string; isLong: boolean; weight: Decimal; leverage: Decimal };
+/** 安全群於某 coin 的單筆投票（方向 + 兩種權重 + 槓桿）。 */
+type Contribution = {
+  coin: string;
+  isLong: boolean;
+  inverseRiskWeight: Decimal; // clamp(1 − riskScore/100)
+  convictionWeight: Decimal; // inverseRiskWeight × positionConvictionShare
+  leverage: Decimal;
+};
 
-/** 某 coin 聚合中的累加器。 */
+/** 某 coin 聚合中的累加器（risk-加權 與 conviction-加權雙軌）。 */
 type CoinAccumulator = {
   longCount: number;
   shortCount: number;
-  signedWeight: Decimal; // Σ(side × weight)
-  totalWeight: Decimal; // Σ weight
+  signedRiskWeight: Decimal; // Σ(side × inverseRiskWeight)
+  totalRiskWeight: Decimal; // Σ inverseRiskWeight
+  signedConvictionWeight: Decimal; // Σ(side × convictionWeight)
+  totalConvictionWeight: Decimal; // Σ convictionWeight
   totalLeverage: Decimal;
 };
 
@@ -114,7 +123,7 @@ export class SafeCohortConsensusService {
     return [...accumulators].map(([coin, accumulator]) => this.toDto(coin, accumulator));
   }
 
-  /** 取某 provider 安全群的當前持倉，join 回權重後產出投票清單。 */
+  /** 取某 provider 安全群的當前持倉，join 回權重 + 計算 conviction 佔比後產出投票清單。 */
   private async accumulateProvider(
     provider: Provider,
     traders: Trader[],
@@ -126,16 +135,30 @@ export class SafeCohortConsensusService {
       [...weightByAddress.keys()],
       freshAfter,
     );
-    const contributions: Contribution[] = [];
+    // 每位交易員當前所有持倉的 notional 總和，供 conviction 佔比。
+    const totalNotionalByAddress = new Map<string, Decimal>();
     for (const position of positions) {
-      const weight = weightByAddress.get(position.traderAddress);
-      if (weight === undefined || position.signedSize.isZero()) {
+      if (position.signedSize.isZero()) {
         continue;
       }
+      const current = totalNotionalByAddress.get(position.traderAddress) ?? ZERO;
+      totalNotionalByAddress.set(position.traderAddress, current.plus(position.positionNotional));
+    }
+    const contributions: Contribution[] = [];
+    for (const position of positions) {
+      const inverseRiskWeight = weightByAddress.get(position.traderAddress);
+      if (inverseRiskWeight === undefined || position.signedSize.isZero()) {
+        continue;
+      }
+      const totalNotional = totalNotionalByAddress.get(position.traderAddress) ?? ZERO;
+      const convictionShare = totalNotional.isZero()
+        ? ZERO
+        : position.positionNotional.dividedBy(totalNotional);
       contributions.push({
         coin: position.coin,
         isLong: position.signedSize.isPositive(),
-        weight,
+        inverseRiskWeight,
+        convictionWeight: inverseRiskWeight.times(convictionShare),
         leverage: position.leverage,
       });
     }
@@ -149,16 +172,22 @@ export class SafeCohortConsensusService {
     const current = accumulators.get(contribution.coin) ?? {
       longCount: 0,
       shortCount: 0,
-      signedWeight: ZERO,
-      totalWeight: ZERO,
+      signedRiskWeight: ZERO,
+      totalRiskWeight: ZERO,
+      signedConvictionWeight: ZERO,
+      totalConvictionWeight: ZERO,
       totalLeverage: ZERO,
     };
-    const signedWeight = contribution.isLong ? contribution.weight : contribution.weight.negated();
+    const sign = contribution.isLong ? ONE : ONE.negated();
     accumulators.set(contribution.coin, {
       longCount: current.longCount + (contribution.isLong ? 1 : 0),
       shortCount: current.shortCount + (contribution.isLong ? 0 : 1),
-      signedWeight: current.signedWeight.plus(signedWeight),
-      totalWeight: current.totalWeight.plus(contribution.weight),
+      signedRiskWeight: current.signedRiskWeight.plus(sign.times(contribution.inverseRiskWeight)),
+      totalRiskWeight: current.totalRiskWeight.plus(contribution.inverseRiskWeight),
+      signedConvictionWeight: current.signedConvictionWeight.plus(
+        sign.times(contribution.convictionWeight),
+      ),
+      totalConvictionWeight: current.totalConvictionWeight.plus(contribution.convictionWeight),
       totalLeverage: current.totalLeverage.plus(contribution.leverage),
     });
   }
@@ -166,12 +195,16 @@ export class SafeCohortConsensusService {
   private toDto(coin: string, accumulator: CoinAccumulator): CoinConsensusDto {
     const participantCount = accumulator.longCount + accumulator.shortCount;
     const count = new Decimal(participantCount);
-    const netDirectionBias = accumulator.totalWeight.isZero()
+    const netDirectionBias = accumulator.totalRiskWeight.isZero()
       ? ZERO
-      : accumulator.signedWeight.dividedBy(accumulator.totalWeight);
+      : accumulator.signedRiskWeight.dividedBy(accumulator.totalRiskWeight);
+    const convictionWeightedDirectionBias = accumulator.totalConvictionWeight.isZero()
+      ? ZERO
+      : accumulator.signedConvictionWeight.dividedBy(accumulator.totalConvictionWeight);
     return {
       coin,
       netDirectionBias: netDirectionBias.toString(),
+      convictionWeightedDirectionBias: convictionWeightedDirectionBias.toString(),
       consensusStrength: netDirectionBias.abs().toString(),
       participantCount,
       longCount: accumulator.longCount,

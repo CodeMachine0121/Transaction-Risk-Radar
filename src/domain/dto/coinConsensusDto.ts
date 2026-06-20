@@ -4,9 +4,11 @@
  */
 export type CoinConsensusDto = {
   coin: string;
-  /** Σ(side × weight) / Σ(weight)，−1…+1（long=+1/short=−1）。 */
+  /** Σ(side × inverseRiskScoreWeight) / Σ(inverseRiskScoreWeight)，−1…+1（long=+1/short=−1）。 */
   netDirectionBias: string;
-  /** |netDirectionBias|，0…1。 */
+  /** conviction 加權方向：權重再乘 positionConvictionShare，分散巨鯨被降權。−1…+1。 */
+  convictionWeightedDirectionBias: string;
+  /** |selectedBias|（依 weighting 選定），0…1。 */
   consensusStrength: string;
   participantCount: number;
   longCount: number;

@@ -87,6 +87,31 @@ describe('SafeCohortConsensusApplication', () => {
     expect(eth?.averageLeverage).toBe('8'); // (10 + 6) / 2
   });
 
+  it('deweights diversified whale books via conviction weighting (can flip the lean)', async () => {
+    const traders = createMockTraderRepository();
+    vi.mocked(traders.findRankableTraders).mockResolvedValue([
+      buildTrader('FOCUS', 0),
+      buildTrader('WHALE1', 0),
+      buildTrader('WHALE2', 0),
+    ]);
+    const positions = createMockPositionRepository();
+    vi.mocked(positions.findCurrentOpenPositions).mockResolvedValue([
+      position('FOCUS', 'BTC', 1, 10, 1000), // 只押 BTC → convictionShare 1
+      position('WHALE1', 'BTC', -1, 10, 100), // BTC 佔其書 100/1000 = 0.1
+      position('WHALE1', 'ALT1', 1, 10, 900),
+      position('WHALE2', 'BTC', -1, 10, 100),
+      position('WHALE2', 'ALT2', 1, 10, 900),
+    ]);
+    const application = buildApplication(traders, positions);
+
+    const btc = (await application.listConsensus({})).coins.find((c) => c.coin === 'BTC');
+
+    expect(btc?.participantCount).toBe(3);
+    expect(Number(btc?.netDirectionBias)).toBeLessThan(0); // 人頭/risk 加權：2 空 1 多 → 偏空
+    expect(Number(btc?.convictionWeightedDirectionBias)).toBeGreaterThan(0); // conviction：聚焦多單勝出
+    expect(Number(btc?.convictionWeightedDirectionBias)).toBeCloseTo(2 / 3, 4); // 0.8 / 1.2
+  });
+
   it('excludes traders above maxRiskScore from the cohort and from the query to positions', async () => {
     const traders = createMockTraderRepository();
     vi.mocked(traders.findRankableTraders).mockResolvedValue([
