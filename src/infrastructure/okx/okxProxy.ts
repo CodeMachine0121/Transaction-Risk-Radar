@@ -7,12 +7,14 @@ import type { TraderActivity } from '../../domain/vo/traderActivity';
 import type { RequestWeightLimiter } from '../../shared/rateLimit/requestWeightLimiter';
 import type {
   RawOkxCurrentSubposition,
+  RawOkxLeadTrader,
   RawOkxLeadTraderRanks,
   RawOkxResponse,
   RawOkxSubposition,
 } from './okxWire';
 
 const ZERO = new Decimal(0);
+const HUNDRED = new Decimal(100);
 
 export type OkxBackoffOptions = {
   maximumRetryCount: number;
@@ -72,7 +74,21 @@ export class OkxProxy implements ITraderDataProxy {
     return ranks.map((rank) => ({
       address: rank.uniqueCode,
       accountValue: new Decimal(rank.aum),
+      winRatio: rank.winRatio === undefined ? undefined : new Decimal(rank.winRatio),
+      accountReturnSeries: this.normalizeReturnSeries(rank.pnlRatios),
     }));
+  }
+
+  /** OKX pnlRatios（newest-first 的 ratio）→ 依時間遞增的百分比序列。無資料則 undefined。 */
+  private normalizeReturnSeries(
+    pnlRatios: RawOkxLeadTrader['pnlRatios'],
+  ): Decimal[] | undefined {
+    if (pnlRatios === undefined || pnlRatios.length === 0) {
+      return undefined;
+    }
+    return [...pnlRatios]
+      .sort((left, right) => Number(left.beginTs) - Number(right.beginTs))
+      .map((point) => new Decimal(point.pnlRatio).times(HUNDRED));
   }
 
   /**

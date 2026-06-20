@@ -5,11 +5,18 @@ export type RawOkxResponse<TData> = {
   data: TData;
 };
 
+export type RawOkxPnlRatio = {
+  beginTs: string;
+  pnlRatio: string;
+};
+
 /** public-lead-traders：data 為陣列，內含 ranks。 */
 export type RawOkxLeadTrader = {
   uniqueCode: string;
   aum: string;
   nickName: string;
+  winRatio?: string;
+  pnlRatios?: RawOkxPnlRatio[];
 };
 
 export type RawOkxLeadTraderRanks = {

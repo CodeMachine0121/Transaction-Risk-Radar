@@ -37,6 +37,35 @@ describe('OkxProxy', () => {
     expect(traders[0]?.accountValue.toString()).toBe('154626.43');
   });
 
+  it('carries account return series (chronological) and winRatio from the ranking', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      okxResponse([
+        {
+          ranks: [
+            {
+              uniqueCode: 'A',
+              aum: '1000',
+              nickName: 'a',
+              winRatio: '0.6',
+              // OKX 回傳 newest-first；正規化後應為依時間遞增（chronological）
+              pnlRatios: [
+                { beginTs: '3000', pnlRatio: '0.03' },
+                { beginTs: '2000', pnlRatio: '0.02' },
+                { beginTs: '1000', pnlRatio: '0.01' },
+              ],
+            },
+          ],
+        },
+      ]),
+    );
+
+    const traders = await buildProxy(fetchMock).fetchTraderList();
+
+    expect(traders[0]?.winRatio?.toString()).toBe('0.6');
+    // ratio→percent（×100）且 chronological（beginTs 1000→3000）
+    expect(traders[0]?.accountReturnSeries?.map((value) => value.toString())).toEqual(['1', '2', '3']);
+  });
+
   it('maps each sub-position into open and close activity legs', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       okxResponse([
