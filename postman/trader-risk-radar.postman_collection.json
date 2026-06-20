@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Trader Risk Radar",
-    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n**風險評分分級（tier，每筆回應皆帶）：**\n- `position`：部位級（精準版）——逐筆部位重建，含 MAE/攤平/槓桿等完整指標；唯一會出現在 /rankings 的等級。\n- `account`：帳戶級（粗版 fallback）——當逐筆部位抓不到（如 OKX 私密帶單員回 60004）但來源提供帳戶彙總（累積報酬曲線 + winRatio）時，以「每期報酬下行標準差 + 帳戶回撤 + 陷阱訊號」估算；**排除於 /rankings**，僅在 /traders 顯示。此級別 MAE/averagingDownRatio/averageLeverage/realizedProfitAndLoss 為 null。\n\n**安全群持倉共識（/consensus）：** 在 riskScore 判定為相對安全可跟的群體（tier=position、非 insufficientData、riskScore ≤ maxRiskScore）中，以 inverse-riskScore 每人一票聚合**當前未平倉**方向，每個 coin 回傳 netDirectionBias(−1…+1)/consensusStrength/參與人數/平均槓桿 + 免責。**描述性，非買賣建議、非價格預測。** 僅 tier=position 參與（OKX account-tier 結構性排除）。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。\n- `accountTierAddress`：一個 OKX 帳戶級（tier=account）交易員的 uniqueCode，供示範 fallback。\n- `coin`：共識查詢的標的（如 BTC / ETH），用於 /consensus/:coin。",
+    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n**風險評分分級（tier，每筆回應皆帶）：**\n- `position`：部位級（精準版）——逐筆部位重建，含 MAE/攤平/槓桿等完整指標；唯一會出現在 /rankings 的等級。\n- `account`：帳戶級（粗版 fallback）——當逐筆部位抓不到（如 OKX 私密帶單員回 60004）但來源提供帳戶彙總（累積報酬曲線 + winRatio）時，以「每期報酬下行標準差 + 帳戶回撤 + 陷阱訊號」估算；**排除於 /rankings**，僅在 /traders 顯示。此級別 MAE/averagingDownRatio/averageLeverage/realizedProfitAndLoss 為 null。\n\n**安全群持倉共識（/consensus）：** 在 riskScore 判定為相對安全可跟的群體（tier=position、非 insufficientData、riskScore ≤ maxRiskScore）中，聚合**當前未平倉**方向。`weighting=conviction`（預設）以「部位 conviction 佔比」加權、降權持有大量 coin 的分散巨鯨；`weighting=equal` 回退每人一票。每個 coin 回傳 net/conviction 兩種方向偏向、consensusStrength、分散度（average/maxConvictionShare）、人數、平均槓桿 + 免責。**描述性，非買賣建議、非價格預測。** 僅 tier=position 參與（OKX account-tier 結構性排除）。\n\n**進場訊號（/signals，EXPERIMENTAL）：** 把共識經規則導出每 coin 的 lean/verdict/setupQuality/reasons 決策輔助。**非下單指令、非倉位建議、非獲利保證；規則預測力尚待回測驗證。** 獨立 opt-in 端點，帶 experimental 旗標與重免責。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。\n- `accountTierAddress`：一個 OKX 帳戶級（tier=account）交易員的 uniqueCode，供示範 fallback。\n- `coin`：共識查詢的標的（如 BTC / ETH），用於 /consensus/:coin。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -139,7 +139,7 @@
         "method": "GET",
         "header": [],
         "url": { "raw": "{{baseUrl}}/consensus", "host": ["{{baseUrl}}"], "path": ["consensus"] },
-        "description": "安全群當前未平倉的方向共識，依 consensusStrength 由高到低排序。\n回應為信封 `{ disclaimer, coins[] }`；每個 coin 含 netDirectionBias（−1…+1，long=+1/short=−1）、consensusStrength、participantCount、longCount/shortCount、longShareOfParticipants、averageLeverage。\n不帶 query 用伺服器預設（maxRiskScore=40、minParticipants=3、新鮮度窗=2×POLL_INTERVAL_MS）。**描述性，非買賣建議。**"
+        "description": "安全群當前未平倉的方向共識，依 consensusStrength 由高到低排序。\n回應為信封 `{ disclaimer, coins[] }`；每個 coin 含：\n- `netDirectionBias`（−1…+1，inverse-riskScore 加權，long=+1/short=−1）\n- `convictionWeightedDirectionBias`（再乘部位 conviction 佔比，分散巨鯨被降權）\n- `consensusStrength`（依 weighting 選定的 lens 之 |bias|，預設 conviction）\n- `participantCount`、`longCount`/`shortCount`、`longShareOfParticipants`\n- `averageConvictionShare`/`maxConvictionShare`（分散度：高 maxConvictionShare = 被單一重押者主導）\n- `newPositionCount`（窗內新觀測到的持倉數，粗略）、`averageLeverage`\n不帶 query 用伺服器預設（weighting=conviction、maxRiskScore=40、minParticipants=3、新鮮度窗=2×POLL_INTERVAL_MS）。**描述性，非買賣建議。**"
       },
       "response": []
     },
@@ -149,18 +149,19 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/consensus?provider=hyperliquid&maxRiskScore=40&minParticipants=3&offset=0&limit=20",
+          "raw": "{{baseUrl}}/consensus?provider=hyperliquid&weighting=conviction&maxRiskScore=40&minParticipants=3&offset=0&limit=20",
           "host": ["{{baseUrl}}"],
           "path": ["consensus"],
           "query": [
             { "key": "provider", "value": "hyperliquid", "description": "來源篩選：hyperliquid / okx。缺漏則涵蓋全部 position-tier 來源。" },
+            { "key": "weighting", "value": "conviction", "description": "加權法 lens（決定 consensusStrength/排序）：conviction（預設，乘 conviction 佔比、降權分散巨鯨）或 equal（每人一票、僅 inverse-riskScore）。其他值回 400。" },
             { "key": "maxRiskScore", "value": "40", "description": "安全群上限：只納入 riskScore ≤ 此值者（0–100，預設 40）。超界回 400。" },
             { "key": "minParticipants", "value": "3", "description": "某 coin 至少需幾位安全交易員才輸出（整數 ≥ 1，預設 3）。< 1 回 400。" },
             { "key": "offset", "value": "0", "description": "分頁起始位移（整數 ≥ 0）。" },
             { "key": "limit", "value": "20", "description": "回傳 coin 筆數上限（整數 ≥ 1，預設 50）。" }
           ]
         },
-        "description": "可調整安全群門檻與分頁的共識查詢。query 皆為選用；參數非法（maxRiskScore 不在 0–100、minParticipants < 1 等）回 400。"
+        "description": "可調整安全群門檻、加權法與分頁的共識查詢。query 皆為選用；參數非法（weighting 非 equal/conviction、maxRiskScore 不在 0–100、minParticipants < 1 等）回 400。\n比較 `weighting=conviction` 與 `weighting=equal` 可看出分散巨鯨被降權前後的方向差異。"
       },
       "response": []
     },
@@ -175,11 +176,42 @@
           "path": ["consensus", "{{coin}}"],
           "query": [
             { "key": "provider", "value": "hyperliquid", "description": "選用：來源篩選。", "disabled": true },
+            { "key": "weighting", "value": "conviction", "description": "選用：加權法 lens（conviction / equal）。", "disabled": true },
             { "key": "maxRiskScore", "value": "40", "description": "選用：安全群上限（0–100）。", "disabled": true },
             { "key": "minParticipants", "value": "3", "description": "選用：最小參與人數（≥ 1）。", "disabled": true }
           ]
         },
         "description": "單一 coin 的安全群持倉共識細節。回應同信封格式但 `coins` 僅含該 coin。\n該 coin 安全群參與人數 < minParticipants（預設 3）時回 404 {\"error\":\"no qualifying consensus for coin\"}。\n先呼叫上面的「Safe Cohort Consensus (all coins)」挑一個有共識的 coin，填入 `coin` 變數（預設 BTC）。"
+      },
+      "response": []
+    },
+    {
+      "name": "Entry Signals (experimental)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/signals", "host": ["{{baseUrl}}"], "path": ["signals"] },
+        "description": "⚠️ **EXPERIMENTAL／未經回測校準。** 由安全群共識經規則導出的**決策輔助**訊號，**非下單指令、非倉位建議、非獲利保證**。\n回應為信封 `{ disclaimer, experimental: true, signals[] }`；每個 coin 含：\n- `lean`（long / short / neutral，由 convictionWeightedDirectionBias 決定）\n- `verdict`（worth-considering / avoid / no-signal）\n- `setupQuality`（0..1 規則綜合分，**非獲利機率**）\n- `reasons[]`（逐條判斷依據）\n規則（保守預設、可校準）：strength < 0.5 或方向不明 / 參與 < 5 → no-signal；平均槓桿 > 15 或一致度 ≥ 0.95（擁擠）→ avoid（只降級不反向）。\n沿用 /consensus 的 querystring。**規則的預測力尚待 B2 回測驗證，請勿據此重壓。**"
+      },
+      "response": []
+    },
+    {
+      "name": "Entry Signals (filtered)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/signals?provider=hyperliquid&weighting=conviction&maxRiskScore=40&minParticipants=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["signals"],
+          "query": [
+            { "key": "provider", "value": "hyperliquid", "description": "選用：來源篩選。" },
+            { "key": "weighting", "value": "conviction", "description": "選用：加權法 lens（conviction / equal）；lean 一律由 conviction 加權方向決定。" },
+            { "key": "maxRiskScore", "value": "40", "description": "選用：安全群上限（0–100）。" },
+            { "key": "minParticipants", "value": "5", "description": "選用：每 coin 最小參與人數；注意訊號規則另有自己的 minimumSignalParticipants=5 門檻。" }
+          ]
+        },
+        "description": "同 Entry Signals，但帶 querystring（與 /consensus 共用解析；非法參數回 400）。EXPERIMENTAL，非投資建議。"
       },
       "response": []
     }
