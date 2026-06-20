@@ -130,18 +130,32 @@ domain **只依「種類」分這五個資料夾**，不出現 `market` / `assem
 - `bun run db:generate` — `prisma generate`
 - `bun run db:migrate` — `prisma migrate dev`（code-first migration）
 - `bun run worker` — 啟動背景 BullMQ 排程（sync → poll → recompute）
+- `bun run compose:up` — `docker compose up -d --build`（打包並起整個 stack：migrate → api → worker + Postgres/Redis）
+- `bun run compose:down` — `docker compose down`（停止 stack；加 `-v` 連 volume 一起清）
+- `bun run compose:logs` — `docker compose logs -f`（跟看所有服務 log）
 
-本機服務（Postgres+TimescaleDB / Redis）：`docker compose up -d`（見 `docker-compose.yml`）。
+### 啟動方式一：全 Docker（推薦，一鍵）
 
-完整啟動流程：
+`Dockerfile` 將主專案打包成單一 image，`api`（`main.ts`）與 `worker`（`worker.ts`）共用、由 compose 指定不同 command；`migrate` 為一次性服務，DB healthy 後跑 `prisma migrate deploy`，api/worker 等它成功（`service_completed_successfully`）才啟動。
 
 ```
-docker compose up -d          # 起 Postgres + Redis
-cp .env.example .env          # 設定環境變數
-bun install                   # postinstall 會自動 prisma generate
-bunx prisma migrate deploy    # 套用 migration（或 bun run db:migrate）
-bun run worker                # 背景同步/輪詢/重算
-bun run start                 # REST API（/health、/rankings、/traders/:address）
+bun run compose:up            # 打包並起 Postgres + Redis + migrate + api + worker
+curl localhost:3000/health    # → {"status":"ok"}
+```
+
+> 容器內連線用服務主機名（`postgres` / `redis`），環境變數直接寫在 `docker-compose.yml`，不吃 `.env`。
+
+### 啟動方式二：本機開發（app 跑在 host）
+
+只用 Docker 起外部依賴，app 跑在本機（watch 模式較適合開發）：
+
+```
+docker compose up -d postgres redis   # 只起 Postgres + Redis
+cp .env.example .env                   # 設定環境變數
+bun install                            # postinstall 會自動 prisma generate
+bunx prisma migrate deploy             # 套用 migration（或 bun run db:migrate）
+bun run worker                         # 背景同步/輪詢/重算
+bun run start                          # REST API（/health、/rankings、/traders/:address）
 ```
 
 > 環境變數見 `.env.example`（複製為 `.env`）。Prisma 指令需要 `DATABASE_URL`。
