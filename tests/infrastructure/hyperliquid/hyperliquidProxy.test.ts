@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HyperliquidProxy } from '@/infrastructure/hyperliquid/hyperliquidProxy';
+import { RequestWeightLimiter } from '@/shared/rateLimit/requestWeightLimiter';
+
+const buildLimiter = (): RequestWeightLimiter =>
+  new RequestWeightLimiter({ maximumWeightPerInterval: 1200, intervalMilliseconds: 60000 });
 
 const jsonResponse = (body: object): Response =>
   new Response(JSON.stringify(body), {
@@ -103,5 +107,55 @@ describe('HyperliquidProxy', () => {
       .mockResolvedValue(new Response('error', { status: 500 }));
 
     await expect(buildProxy(fetchMock).fetchOpenPositions('0xabc')).rejects.toThrow();
+  });
+
+  it('acquires clearinghouseState weight before requesting open positions', async () => {
+    const limiter = buildLimiter();
+    const acquireSpy = vi.spyOn(limiter, 'acquire');
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ assetPositions: [] }));
+    const proxy = new HyperliquidProxy({
+      infoApiBaseUrl: 'https://api.hyperliquid.xyz',
+      statsDataBaseUrl: 'https://stats-data.hyperliquid.xyz',
+      fetchFunction: fetchMock,
+      requestWeightLimiter: limiter,
+    });
+
+    await proxy.fetchOpenPositions('0xabc');
+
+    expect(acquireSpy).toHaveBeenCalledWith(2);
+  });
+
+  it('acquires userFillsByTime weight before requesting fills', async () => {
+    const limiter = buildLimiter();
+    const acquireSpy = vi.spyOn(limiter, 'acquire');
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse([]));
+    const proxy = new HyperliquidProxy({
+      infoApiBaseUrl: 'https://api.hyperliquid.xyz',
+      statsDataBaseUrl: 'https://stats-data.hyperliquid.xyz',
+      fetchFunction: fetchMock,
+      requestWeightLimiter: limiter,
+    });
+
+    await proxy.fetchUserFills('0xabc', 1000);
+
+    expect(acquireSpy).toHaveBeenCalledWith(20);
+  });
+
+  it('does not consume weight budget for the leaderboard request', async () => {
+    const limiter = buildLimiter();
+    const acquireSpy = vi.spyOn(limiter, 'acquire');
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse({ leaderboardRows: [] }));
+    const proxy = new HyperliquidProxy({
+      infoApiBaseUrl: 'https://api.hyperliquid.xyz',
+      statsDataBaseUrl: 'https://stats-data.hyperliquid.xyz',
+      fetchFunction: fetchMock,
+      requestWeightLimiter: limiter,
+    });
+
+    await proxy.fetchLeaderboard();
+
+    expect(acquireSpy).not.toHaveBeenCalled();
   });
 });
