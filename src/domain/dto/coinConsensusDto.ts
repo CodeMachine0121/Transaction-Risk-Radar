@@ -15,5 +15,9 @@ export type CoinConsensusDto = {
   shortCount: number;
   /** longCount / participantCount。 */
   longShareOfParticipants: string;
+  /** 該 coin 參與者 positionConvictionShare 的平均；低代表參與者多為分散書。 */
+  averageConvictionShare: string;
+  /** 該 coin 參與者中最大的單一 positionConvictionShare；高代表被單一重押者主導。 */
+  maxConvictionShare: string;
   averageLeverage: string;
 };

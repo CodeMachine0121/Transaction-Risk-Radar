@@ -21,7 +21,8 @@ type Contribution = {
   coin: string;
   isLong: boolean;
   inverseRiskWeight: Decimal; // clamp(1 − riskScore/100)
-  convictionWeight: Decimal; // inverseRiskWeight × positionConvictionShare
+  convictionShare: Decimal; // positionNotional / 該交易員當前總 notional
+  convictionWeight: Decimal; // inverseRiskWeight × convictionShare
   leverage: Decimal;
 };
 
@@ -33,6 +34,8 @@ type CoinAccumulator = {
   totalRiskWeight: Decimal; // Σ inverseRiskWeight
   signedConvictionWeight: Decimal; // Σ(side × convictionWeight)
   totalConvictionWeight: Decimal; // Σ convictionWeight
+  totalConvictionShare: Decimal; // Σ convictionShare（算平均用）
+  maxConvictionShare: Decimal; // max convictionShare（單人主導程度）
   totalLeverage: Decimal;
 };
 
@@ -160,6 +163,7 @@ export class SafeCohortConsensusService {
         coin: position.coin,
         isLong: position.signedSize.isPositive(),
         inverseRiskWeight,
+        convictionShare,
         convictionWeight: inverseRiskWeight.times(convictionShare),
         leverage: position.leverage,
       });
@@ -178,6 +182,8 @@ export class SafeCohortConsensusService {
       totalRiskWeight: ZERO,
       signedConvictionWeight: ZERO,
       totalConvictionWeight: ZERO,
+      totalConvictionShare: ZERO,
+      maxConvictionShare: ZERO,
       totalLeverage: ZERO,
     };
     const sign = contribution.isLong ? ONE : ONE.negated();
@@ -190,6 +196,10 @@ export class SafeCohortConsensusService {
         sign.times(contribution.convictionWeight),
       ),
       totalConvictionWeight: current.totalConvictionWeight.plus(contribution.convictionWeight),
+      totalConvictionShare: current.totalConvictionShare.plus(contribution.convictionShare),
+      maxConvictionShare: contribution.convictionShare.greaterThan(current.maxConvictionShare)
+        ? contribution.convictionShare
+        : current.maxConvictionShare,
       totalLeverage: current.totalLeverage.plus(contribution.leverage),
     });
   }
@@ -216,6 +226,10 @@ export class SafeCohortConsensusService {
       longShareOfParticipants: count.isZero()
         ? '0'
         : new Decimal(accumulator.longCount).dividedBy(count).toString(),
+      averageConvictionShare: count.isZero()
+        ? '0'
+        : accumulator.totalConvictionShare.dividedBy(count).toString(),
+      maxConvictionShare: accumulator.maxConvictionShare.toString(),
       averageLeverage: count.isZero() ? '0' : accumulator.totalLeverage.dividedBy(count).toString(),
     };
   }

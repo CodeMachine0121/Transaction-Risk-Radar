@@ -138,6 +138,29 @@ describe('SafeCohortConsensusApplication', () => {
     expect(Number(equal?.consensusStrength)).toBeCloseTo(1 / 3, 4); // |net (risk) bias|
   });
 
+  it('reports conviction-share distribution per coin (average + max)', async () => {
+    const traders = createMockTraderRepository();
+    vi.mocked(traders.findRankableTraders).mockResolvedValue([
+      buildTrader('FOCUS', 0),
+      buildTrader('WHALE1', 0),
+      buildTrader('WHALE2', 0),
+    ]);
+    const positions = createMockPositionRepository();
+    vi.mocked(positions.findCurrentOpenPositions).mockResolvedValue([
+      position('FOCUS', 'BTC', 1, 10, 1000), // BTC share 1
+      position('WHALE1', 'BTC', -1, 10, 100), // BTC share 0.1
+      position('WHALE1', 'ALT1', 1, 10, 900),
+      position('WHALE2', 'BTC', -1, 10, 100), // BTC share 0.1
+      position('WHALE2', 'ALT2', 1, 10, 900),
+    ]);
+    const application = buildApplication(traders, positions);
+
+    const btc = (await application.listConsensus({})).coins.find((c) => c.coin === 'BTC');
+
+    expect(Number(btc?.averageConvictionShare)).toBeCloseTo(0.4, 4); // (1 + 0.1 + 0.1) / 3
+    expect(btc?.maxConvictionShare).toBe('1'); // FOCUS 只押 BTC
+  });
+
   it('excludes traders above maxRiskScore from the cohort and from the query to positions', async () => {
     const traders = createMockTraderRepository();
     vi.mocked(traders.findRankableTraders).mockResolvedValue([
