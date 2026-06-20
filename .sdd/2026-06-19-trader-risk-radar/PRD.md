@@ -168,12 +168,12 @@ synchronizeLeaderboard ──▶ traders
 | 浮虧時間序列（算 MAE）、槓桿                                     | 定時 poll `clearinghouseState` | `position_snapshots`（每次輪詢一筆 `unrealizedProfitAndLossPercentage` + `leverage`） |
 | 追蹤名單                                                         | `leaderboard`（GET）           | `traders`                                                                             |
 
-**倉位重建（`reconstructPositions`，純 domain 邏輯）：** 將某交易員的 fills 依標的分組、按時間排序，追蹤帶號持倉量，逐筆分類為 open/add/reduce/close；持倉量歸零即為一個已閉倉位、反向穿越（sign flip）視為「平舊倉＋開新倉」。每倉位的 `realizedProfitAndLoss = Σ closedPnl`、`realizedReturnPercentage` 以 ROI 法計（見規則 3）。
+**倉位重建（`reconstructPositions`，純 domain 邏輯）：** 將某交易員的 fills 依標的分組、按時間排序，追蹤帶號持倉量，逐筆分類為 open/add/reduce/close；持倉量歸零即為一個已閉倉位、反向穿越（sign flip）視為「平舊倉＋開新倉」。每倉位的 `realizedProfitAndLoss = Σ closedPnl`、`realizedReturnPercentage` 以 ROI 法計（見規則 3）。**帶號持倉量以第一筆 fill 的 `startPosition` 起算**（抓取窗常從持倉中途開始，若從 0 起算則持倉永遠回不到真正的 0、永遠偵測不到平倉）。
 
 - 去重鍵：fill 的 `tid`。
 - **槓桿**：來自 poll `clearinghouseState`、記於 `position_snapshots.leverage`（fills 不含槓桿）；`averageLeverage(position)` = 該倉位 snapshots 的槓桿平均。
 - **組裝**：`assembleTraderPositionInputs` 把「重建倉位 + 其 snapshots」併為 `computeTraderMetrics` 的輸入；**沒有任何 snapshot 的倉位（開倉與平倉落在同一輪詢間隔內、從未被觀測到開倉）會被排除**（無法算 MAE/槓桿）。
-- **已知限制：** 假設每個標的的 fill 歷史從「無持倉」開始；若歷史被截斷（起始即有持倉）可能誤判首個殘缺倉位 → 攝取時應抓取足夠長的歷史。
+- **期初持倉（carried position）排除：** 抓取窗起點常已持倉（首筆 fill `startPosition` 非零）；此「期初已持有」倉位的開倉發生於窗外、進場價未知，**一律排除、不計入已平倉位**，只統計窗內完整「開→平」的倉位。實作以第一筆 fill 的 `startPosition` 起算持倉量，並標記該段為 carried 直到歸零後丟棄。
 
 ### Edge Cases
 

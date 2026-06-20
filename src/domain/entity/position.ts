@@ -135,29 +135,37 @@ export class Position {
       const ordered = [...coinFills].sort((left, right) => left.timestamp - right.timestamp);
       const coinPositions: Position[] = [];
       let events: PositionLifecycleEvent[] = [];
-      let side: PositionSide = 'long';
+      // 以第一筆 fill 的 startPosition 起算持倉量：抓取窗常從持倉中途開始，
+      // 若仍從 0 起算則持倉永遠回不到真正的 0、永遠偵測不到平倉。
+      let running = ordered[0]?.startPosition ?? ZERO;
+      // 期初已持有（startPosition 非零）= 開倉於窗外、進場價未知，視為 carried：
+      // 統計時排除（不計入已平倉位），只計窗內完整開→平的倉位。
+      let carried = !running.isZero();
+      let side: PositionSide = running.isPositive() ? 'long' : 'short';
       let realizedProfitAndLoss = ZERO;
-      let running = ZERO;
-      let open = false;
+      let open = carried;
       let openedAt = 0;
       let closedAt: number | null = null;
 
       const finalize = (closed: boolean): void => {
-        coinPositions.push(
-          new Position({
-            coin,
-            side,
-            events,
-            snapshots: [],
-            realizedProfitAndLoss,
-            closed,
-            openedAt,
-            closedAt: closed ? closedAt : null,
-          }),
-        );
+        if (!carried) {
+          coinPositions.push(
+            new Position({
+              coin,
+              side,
+              events,
+              snapshots: [],
+              realizedProfitAndLoss,
+              closed,
+              openedAt,
+              closedAt: closed ? closedAt : null,
+            }),
+          );
+        }
         events = [];
         realizedProfitAndLoss = ZERO;
         open = false;
+        carried = false;
         closedAt = null;
       };
 

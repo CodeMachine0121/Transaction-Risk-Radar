@@ -13,13 +13,14 @@ const fill = (spec: {
   time: number;
   closedPnl?: number;
   coin?: string;
+  startPosition?: number;
 }): TraderFill => ({
   coin: spec.coin ?? 'ETH',
   price: new Decimal(spec.price),
   size: new Decimal(spec.size),
   side: spec.side,
   timestamp: spec.time,
-  startPosition: new Decimal(0),
+  startPosition: new Decimal(spec.startPosition ?? 0),
   direction: '',
   closedProfitAndLoss: new Decimal(spec.closedPnl ?? 0),
   tradeId: spec.time,
@@ -120,6 +121,27 @@ describe('Position.reconstruct', () => {
     expect(positions[0]?.realizedReturnPercentage().toString()).toBe('20');
     expect(positions[1]?.side()).toBe('short');
     expect(positions[1]?.isClosed()).toBe(false);
+  });
+
+  it('excludes a position carried in before the fetch window, counting only fresh ones', () => {
+    const positions = Position.reconstruct([
+      // 期初已持有 long size 2（startPosition 非零），於窗內逐步平掉 → 應排除（進場價在窗外）。
+      fill({ side: 'sell', price: 110, size: 1, time: 1, startPosition: 2, closedPnl: 5 }),
+      fill({ side: 'sell', price: 120, size: 1, time: 2, startPosition: 1, closedPnl: 5 }),
+      // 窗內完整開→平的倉位 → 應計入。
+      fill({ side: 'buy', price: 100, size: 1, time: 3, startPosition: 0 }),
+      fill({ side: 'sell', price: 110, size: 1, time: 4, startPosition: 1, closedPnl: 10 }),
+    ]);
+    expect(positions).toHaveLength(1);
+    expect(positions[0]?.isClosed()).toBe(true);
+    expect(positions[0]?.realizedReturnPercentage().toString()).toBe('10');
+  });
+
+  it('excludes a still-open carried-in position entirely', () => {
+    const positions = Position.reconstruct([
+      fill({ side: 'buy', price: 100, size: 1, time: 1, startPosition: 3 }),
+    ]);
+    expect(positions).toHaveLength(0);
   });
 });
 
