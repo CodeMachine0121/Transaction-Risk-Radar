@@ -12,10 +12,16 @@ const MAX_ADVERSE_EXCURSION_CAP = new Decimal(50);
 const AVERAGE_LEVERAGE_CAP = new Decimal(20);
 const RETURN_DOWNSIDE_DEVIATION_CAP = new Decimal(30);
 const DEFAULT_MINIMUM_CLOSED_POSITIONS = 20;
+const DEFAULT_METRICS_WINDOW_DAYS = 90;
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type TraderReconstructOptions = {
   minimumClosedPositions?: number;
   weights?: RiskScoreWeights;
+  /** 盈虧/勝率/下行標準差的回看時間窗（天），預設 90（見 PRD 第 4 章）。 */
+  windowDays?: number;
+  /** 時間窗的基準時刻（ms），預設為現在；供測試注入固定時間。 */
+  asOf?: number;
 };
 
 /**
@@ -44,10 +50,21 @@ export class Trader {
     const minimumClosedPositions =
       options.minimumClosedPositions ?? DEFAULT_MINIMUM_CLOSED_POSITIONS;
     const weights = options.weights ?? DEFAULT_RISK_SCORE_WEIGHTS;
+    const asOf = options.asOf ?? Date.now();
+    const windowStart =
+      asOf - (options.windowDays ?? DEFAULT_METRICS_WINDOW_DAYS) * MILLISECONDS_PER_DAY;
 
     // 只有被觀測到開倉（有 snapshot）的倉位才能貢獻指標。
     const considered = positions.filter((position) => position.hasSnapshots());
-    const closed = considered.filter((position) => position.isClosed());
+    // 盈虧/勝率/下行標準差只看時間窗內的已平倉位（PRD 第 4 章「近 90 天」口徑）；
+    // 平倉時間未知者保守視為窗內，不靜默丟棄。
+    const closed = considered.filter((position) => {
+      if (!position.isClosed()) {
+        return false;
+      }
+      const closedAt = position.closedAt();
+      return closedAt === null || closedAt >= windowStart;
+    });
     const closedPositionCount = closed.length;
 
     if (closedPositionCount < minimumClosedPositions) {

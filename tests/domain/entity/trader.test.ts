@@ -82,6 +82,62 @@ describe('Trader.reconstruct', () => {
     });
     expect(trader.toRiskDto().closedPositionCount).toBe(1);
   });
+
+  it('excludes closed positions outside the 90-day window from p&l and win-rate metrics', () => {
+    const asOf = 1_700_000_000_000;
+    const day = 86_400_000;
+    const recentWin = new Position({
+      coin: 'ETH',
+      side: 'long',
+      events: [event('open', 100, 1)],
+      snapshots: [snapshot(-10, 10)],
+      realizedProfitAndLoss: new Decimal(10),
+      closed: true,
+      openedAt: asOf - 2 * day,
+      closedAt: asOf - day,
+    });
+    const staleLoss = new Position({
+      coin: 'BTC',
+      side: 'long',
+      events: [event('open', 100, 1)],
+      snapshots: [snapshot(-10, 10)],
+      realizedProfitAndLoss: new Decimal(-50),
+      closed: true,
+      openedAt: asOf - 201 * day,
+      closedAt: asOf - 200 * day,
+    });
+    const trader = Trader.reconstruct('0xA', [recentWin, staleLoss], {
+      minimumClosedPositions: 1,
+      asOf,
+    });
+    const dto = trader.toRiskDto();
+
+    expect(dto.closedPositionCount).toBe(1); // only the in-window position contributes
+    expect(dto.winRate).toBe('1'); // the stale loss is excluded from the win rate
+  });
+
+  it('flags insufficient data when every closed position is outside the window', () => {
+    const asOf = 1_700_000_000_000;
+    const day = 86_400_000;
+    const staleClosed = (coin: string): Position =>
+      new Position({
+        coin,
+        side: 'long',
+        events: [event('open', 100, 1)],
+        snapshots: [snapshot(-10, 10)],
+        realizedProfitAndLoss: new Decimal(5),
+        closed: true,
+        openedAt: asOf - 201 * day,
+        closedAt: asOf - 200 * day,
+      });
+    const trader = Trader.reconstruct('0xA', [staleClosed('ETH'), staleClosed('BTC')], {
+      minimumClosedPositions: 1,
+      asOf,
+    });
+
+    expect(trader.isInsufficientData()).toBe(true);
+    expect(trader.toRiskDto().closedPositionCount).toBe(0);
+  });
 });
 
 describe('Trader.fromStoredMetrics', () => {
