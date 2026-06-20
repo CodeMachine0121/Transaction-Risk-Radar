@@ -10,6 +10,8 @@ export interface ITraderRepository {
   findAllTraderKeys(): Promise<TraderKey[]>;
   /** 取得所有可排行（非 insufficientData）的交易員；可選擇只取某 provider。 */
   findRankableTraders(provider?: Provider): Promise<Trader[]>;
+  /** 取得所有已重算的交易員（含 insufficientData）；可選擇只取某 provider。 */
+  findAllTraders(provider?: Provider): Promise<Trader[]>;
   /** 依 `(provider, address)` 取得單一交易員；不存在回傳 null。 */
   findTrader(provider: Provider, traderAddress: string): Promise<Trader | null>;
   /** 持久化交易員重算後的彙總指標（trader 自帶 provider）。 */

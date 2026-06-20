@@ -68,6 +68,13 @@ export class TraderRepository implements ITraderRepository {
     return rows.map(toTrader);
   }
 
+  async findAllTraders(provider?: Provider): Promise<Trader[]> {
+    const rows = await this.prismaClient.traderMetrics.findMany({
+      where: provider === undefined ? {} : { provider: toPrismaProvider(provider) },
+    });
+    return rows.map(toTrader);
+  }
+
   async findTrader(provider: Provider, traderAddress: string): Promise<Trader | null> {
     const row = await this.prismaClient.traderMetrics.findUnique({
       where: { provider_traderAddress: { provider: toPrismaProvider(provider), traderAddress } },

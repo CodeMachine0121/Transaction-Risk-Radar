@@ -30,6 +30,7 @@ export const createMockTraderRepository = (): ITraderRepository => ({
     .mockResolvedValue(undefined),
   findAllTraderKeys: vi.fn<() => Promise<TraderKey[]>>().mockResolvedValue([]),
   findRankableTraders: vi.fn<(provider?: Provider) => Promise<Trader[]>>().mockResolvedValue([]),
+  findAllTraders: vi.fn<(provider?: Provider) => Promise<Trader[]>>().mockResolvedValue([]),
   findTrader: vi
     .fn<(provider: Provider, traderAddress: string) => Promise<Trader | null>>()
     .mockResolvedValue(null),
