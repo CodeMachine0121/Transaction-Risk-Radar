@@ -1,11 +1,14 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { ListTradersApplication } from './application/listTradersApplication';
 import { RiskRankingApplication } from './application/riskRankingApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { RiskRankingController } from './controller/riskRankingController';
 import { TraderDetailController } from './controller/traderDetailController';
+import { TraderListController } from './controller/traderListController';
 import type { ITraderRepository } from './domain/interface/iTraderRepository';
 import { RiskRankingService } from './domain/service/riskRankingService';
 import { TraderDetailService } from './domain/service/traderDetailService';
+import { TraderListService } from './domain/service/traderListService';
 
 export type BuildServerOptions = {
   logger?: boolean;
@@ -29,7 +32,11 @@ export function buildServer(
   const traderDetailController = new TraderDetailController(
     new TraderDetailApplication(new TraderDetailService(traderRepository)),
   );
+  const traderListController = new TraderListController(
+    new ListTradersApplication(new TraderListService(traderRepository)),
+  );
   riskRankingController.register(server);
+  traderListController.register(server);
   traderDetailController.register(server);
 
   return server;

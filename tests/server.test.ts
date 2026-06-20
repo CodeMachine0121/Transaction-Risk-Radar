@@ -48,6 +48,31 @@ describe('HTTP API', () => {
     expect(body.map((trader) => trader.traderAddress)).toEqual(['A', 'B']);
   });
 
+  it('GET /traders lists all traders including insufficientData ones', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findAllTraders).mockResolvedValue([
+      buildTrader('A', 70),
+      buildTrader('B', null),
+    ]);
+    server = buildServer(repository);
+
+    const response = await server.inject({ method: 'GET', url: '/traders' });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<TraderRiskDto[]>();
+    expect(body.map((dto) => dto.traderAddress).sort()).toEqual(['A', 'B']);
+  });
+
+  it('GET /traders passes ?provider= to the repository', async () => {
+    const repository = createMockTraderRepository();
+    vi.mocked(repository.findAllTraders).mockResolvedValue([]);
+    server = buildServer(repository);
+
+    await server.inject({ method: 'GET', url: '/traders?provider=okx' });
+
+    expect(repository.findAllTraders).toHaveBeenCalledWith(Provider.Okx);
+  });
+
   it('GET /traders/:address returns the trader detail', async () => {
     const repository = createMockTraderRepository();
     vi.mocked(repository.findTrader).mockResolvedValue(buildTrader('A', 70));

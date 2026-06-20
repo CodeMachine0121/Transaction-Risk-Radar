@@ -64,6 +64,7 @@ _Records business operations, function logic, and their corresponding business a
 | 計算風險分數                    | `computeRiskScore`                          | 分析引擎排程                 | 加權組合各指標為 `riskScore`，供排行排序                                       | 權重見 PRD 第 4 章               |
 | 查詢風險排行 Query Risk Ranking | `getRiskRanking` (`GET /rankings`)          | 使用者呼叫 REST API          | 回傳依 riskScore 排序的交易員列表                                              | 支援排序/分頁                    |
 | 查詢交易員詳情 Query Trader     | `getTraderDetail` (`GET /traders/:address`) | 使用者呼叫 REST API          | 回傳單一交易員的完整指標、攤平標記、MAE                                        |                                  |
+| 列出追蹤交易員 List Traders     | `listTraders` (`GET /traders`)              | 使用者呼叫 REST API          | 列出**所有**追蹤交易員（含 `insufficientData`、未可排行者）；支援 `?provider=` 與分頁 | 補 `getRiskRanking` 只回可排行者的可視性缺口 |
 | 依權重限流 Throttle by Weight   | `throttleByRequestWeight`                   | 每次 `/info` 請求前          | 依請求 weight 取 token；額度不足時 block-and-wait 等回填，結構性壓在預算內     | token bucket，行程內（單一 worker/IP） |
 | 限流退避重試 Backoff on 429     | `retryWithBackoffOnTooManyRequests`         | 收到 HTTP 429                | 讀 `Retry-After`，exponential backoff + jitter 重試（含上限），取代直接 throw | 限 `/info`；leaderboard 亦適用退避但不計 weight |
 | 增量輪詢成交 Poll Fills Incrementally | `pollTraderFillsSinceLatest`          | 分層排程                     | 以 `latestObservedFillTimestamp` 作 `startTime` 增量抓 fills，不再每輪重抓 90 天 | 無歷史成交者退回首次 lookback     |
