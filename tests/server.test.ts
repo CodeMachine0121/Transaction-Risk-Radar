@@ -21,7 +21,9 @@ const currentPosition = (
   coin,
   signedSize: new Decimal(signedSize),
   leverage: new Decimal(10),
+  positionNotional: new Decimal(Math.abs(signedSize) * 100),
   capturedAt: 1000,
+  firstObservedAt: 1000,
 });
 
 let server: FastifyInstance | null = null;

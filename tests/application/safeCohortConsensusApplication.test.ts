@@ -12,13 +12,17 @@ const position = (
   coin: string,
   signedSize: number,
   leverage: number,
+  positionNotional = Math.abs(signedSize) * 100,
   capturedAt = 1000,
+  firstObservedAt = capturedAt,
 ): CurrentOpenPosition => ({
   traderAddress,
   coin,
   signedSize: new Decimal(signedSize),
   leverage: new Decimal(leverage),
+  positionNotional: new Decimal(positionNotional),
   capturedAt,
+  firstObservedAt,
 });
 
 const buildApplication = (

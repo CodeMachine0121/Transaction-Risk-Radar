@@ -100,25 +100,34 @@ export class PositionRepository implements IPositionRepository {
       },
       orderBy: { capturedAt: 'desc' },
     });
-    // rows 依 capturedAt 遞減：每個 (traderAddress, coin) 首見即最新；已平倉（signedSize=0）排除。
-    const seen = new Set<string>();
-    const current: CurrentOpenPosition[] = [];
+    // rows 依 capturedAt 遞減：每個 (traderAddress, coin) 首見即最新（決定當前持倉），
+    // 並沿途更新窗內最早 capturedAt 作 firstObservedAt；已平倉（signedSize=0）排除。
+    const byKey = new Map<string, { row: PositionSnapshotRow; firstObservedAt: number }>();
     for (const row of rows) {
       const key = `${row.traderAddress}:${row.coin}`;
-      if (seen.has(key)) {
-        continue;
+      const existing = byKey.get(key);
+      const capturedAt = row.capturedAt.getTime();
+      if (existing === undefined) {
+        byKey.set(key, { row, firstObservedAt: capturedAt });
+      } else if (capturedAt < existing.firstObservedAt) {
+        existing.firstObservedAt = capturedAt;
       }
-      seen.add(key);
+    }
+    const current: CurrentOpenPosition[] = [];
+    for (const { row, firstObservedAt } of byKey.values()) {
       const signedSize = new Decimal(row.signedSize.toString());
       if (signedSize.isZero()) {
         continue;
       }
+      const markPrice = new Decimal(row.markPrice.toString());
       current.push({
         traderAddress: row.traderAddress,
         coin: row.coin,
         signedSize,
         leverage: new Decimal(row.leverage.toString()),
+        positionNotional: signedSize.abs().times(markPrice),
         capturedAt: row.capturedAt.getTime(),
+        firstObservedAt,
       });
     }
     return current;
