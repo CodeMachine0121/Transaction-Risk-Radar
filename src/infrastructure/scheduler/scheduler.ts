@@ -51,11 +51,28 @@ export class Scheduler {
         await this.recomputeAllTraders();
       },
     );
+    // 啟動即跑一輪，排行不必等第一個 interval 才有資料（見 PRD US-03/04/05 驗收）。
+    await this.runInitialCycle();
   }
 
   async stop(): Promise<void> {
     await Promise.all(this.workers.map((worker) => worker.close()));
     await Promise.all(this.queues.map((queue) => queue.close()));
+  }
+
+  /**
+   * 啟動時立即依序跑一輪 sync → poll → recompute，讓排行不必等第一個 interval 才有資料。
+   * sync 失敗只回報、不中斷啟動：repeatable 排程會在下一個 interval 重試。
+   */
+  async runInitialCycle(): Promise<void> {
+    try {
+      await this.applications.syncLeaderboardApplication.sync();
+    } catch (caught) {
+      this.reportSyncError(caught instanceof Error ? caught : new Error(String(caught)));
+      return;
+    }
+    await this.pollAllTraders();
+    await this.recomputeAllTraders();
   }
 
   private async registerRepeatable(
@@ -112,5 +129,9 @@ export class Scheduler {
       return;
     }
     process.stderr.write(`[scheduler:${phase}] ${traderAddress} failed: ${error.message}\n`);
+  }
+
+  private reportSyncError(error: Error): void {
+    process.stderr.write(`[scheduler:sync] leaderboard sync failed: ${error.message}\n`);
   }
 }

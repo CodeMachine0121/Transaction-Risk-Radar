@@ -67,6 +67,52 @@ describe('Scheduler per-trader isolation', () => {
     expect(onTraderError).toHaveBeenCalledWith('recompute', 'B', expect.any(Error));
   });
 
+  it('runs sync then poll then recompute once on the initial cycle', async () => {
+    const traderRepository = createMockTraderRepository();
+    vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A']);
+    const hyperliquidProxy = createMockHyperliquidProxy();
+    const callOrder: string[] = [];
+    vi.mocked(traderRepository.saveTraders).mockImplementation(async () => {
+      callOrder.push('sync');
+    });
+    vi.mocked(hyperliquidProxy.fetchUserFills).mockImplementation(async () => {
+      callOrder.push('poll');
+      return [];
+    });
+    vi.mocked(traderRepository.saveTraderMetrics).mockImplementation(async () => {
+      callOrder.push('recompute');
+    });
+    const scheduler = buildScheduler({
+      hyperliquidProxy,
+      positionRepository: createMockPositionRepository(),
+      traderRepository,
+      onTraderError: vi.fn(),
+    });
+
+    await scheduler.runInitialCycle();
+
+    expect(hyperliquidProxy.fetchUserFills).toHaveBeenCalledWith('A', expect.any(Number));
+    // 順序：sync → poll → recompute。
+    expect(callOrder).toEqual(['sync', 'poll', 'recompute']);
+  });
+
+  it('skips poll and recompute when the initial sync fails', async () => {
+    const traderRepository = createMockTraderRepository();
+    vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A']);
+    const hyperliquidProxy = createMockHyperliquidProxy();
+    vi.mocked(hyperliquidProxy.fetchLeaderboard).mockRejectedValue(new Error('rate limited'));
+    const scheduler = buildScheduler({
+      hyperliquidProxy,
+      positionRepository: createMockPositionRepository(),
+      traderRepository,
+      onTraderError: vi.fn(),
+    });
+
+    await expect(scheduler.runInitialCycle()).resolves.toBeUndefined(); // 不中斷啟動
+    expect(hyperliquidProxy.fetchUserFills).not.toHaveBeenCalled();
+    expect(traderRepository.saveTraderMetrics).not.toHaveBeenCalled();
+  });
+
   it('polls every trader even when one fails, reporting the failure', async () => {
     const traderRepository = createMockTraderRepository();
     vi.mocked(traderRepository.findAllAddresses).mockResolvedValue(['A', 'B', 'C']);
