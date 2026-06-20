@@ -67,6 +67,8 @@ export class TraderRepository implements ITraderRepository {
     const rows = await this.prismaClient.traderMetrics.findMany({
       where: {
         insufficientData: false,
+        // 帳戶級（粗版）風險不參與排行，只在 /traders 顯示。
+        riskScoreTier: 'position',
         ...(provider === undefined ? {} : { provider: toPrismaProvider(provider) }),
       },
     });
