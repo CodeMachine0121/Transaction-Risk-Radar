@@ -1,6 +1,7 @@
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import type { PollTraderApplication } from '../../application/pollTraderApplication';
 import type { RecomputeTraderMetricsApplication } from '../../application/recomputeTraderMetricsApplication';
+import type { SnapshotConsensusApplication } from '../../application/snapshotConsensusApplication';
 import type { SyncLeaderboardApplication } from '../../application/syncLeaderboardApplication';
 import type { ITraderRepository } from '../../domain/interface/iTraderRepository';
 import type { Provider } from '../../domain/vo/provider';
@@ -19,6 +20,8 @@ export type SchedulerApplications = {
   /** recompute 與來源無關（只讀 DB），以 (provider, address) 重算。 */
   recomputeTraderMetricsApplication: RecomputeTraderMetricsApplication;
   traderRepository: ITraderRepository;
+  /** 選用：recompute 後留存一輪共識時序（供回測）。未提供則略過。 */
+  snapshotConsensusApplication?: SnapshotConsensusApplication;
 };
 
 export type SchedulerOptions = {
@@ -76,6 +79,7 @@ export class Scheduler {
     await Promise.allSettled(
       this.applications.providers.map((pipeline) => this.runProviderInitialPipeline(pipeline)),
     );
+    await this.snapshotConsensus();
   }
 
   private async runProviderInitialPipeline(pipeline: ProviderPipeline): Promise<void> {
@@ -111,6 +115,21 @@ export class Scheduler {
   async recomputeAllTraders(): Promise<void> {
     const keys = await this.applications.traderRepository.findAllTraderKeys();
     await this.recomputeKeys(keys);
+    await this.snapshotConsensus();
+  }
+
+  /** recompute 後留存一輪共識時序（供回測）；未配置或失敗只回報、不中斷排程。 */
+  private async snapshotConsensus(): Promise<void> {
+    const application = this.applications.snapshotConsensusApplication;
+    if (application === undefined) {
+      return;
+    }
+    try {
+      await application.snapshot({});
+    } catch (caught) {
+      const error = caught instanceof Error ? caught : new Error(String(caught));
+      process.stderr.write(`[scheduler:snapshot] consensus snapshot failed: ${error.message}\n`);
+    }
   }
 
   private async syncProvider(pipeline: ProviderPipeline): Promise<boolean> {

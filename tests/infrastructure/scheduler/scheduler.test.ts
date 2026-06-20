@@ -1,15 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PollTraderApplication } from '@/application/pollTraderApplication';
 import { RecomputeTraderMetricsApplication } from '@/application/recomputeTraderMetricsApplication';
+import { SnapshotConsensusApplication } from '@/application/snapshotConsensusApplication';
 import { SyncLeaderboardApplication } from '@/application/syncLeaderboardApplication';
 import { PollTraderService } from '@/domain/service/pollTraderService';
 import { RecomputeTraderMetricsService } from '@/domain/service/recomputeTraderMetricsService';
+import { SafeCohortConsensusService } from '@/domain/service/safeCohortConsensusService';
+import { SnapshotConsensusService } from '@/domain/service/snapshotConsensusService';
 import { SyncLeaderboardService } from '@/domain/service/syncLeaderboardService';
 import type { ITraderDataProxy } from '@/domain/interface/iTraderDataProxy';
 import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
 import type { ITraderRepository } from '@/domain/interface/iTraderRepository';
 import { Provider } from '@/domain/vo/provider';
 import { Scheduler } from '@/infrastructure/scheduler/scheduler';
+import { createMockConsensusSnapshotRepository } from '../../application/support/mockConsensusSnapshotRepository';
 import { createMockHyperliquidProxy } from '../../application/support/mockHyperliquidProxy';
 import { createMockPositionRepository } from '../../application/support/mockPositionRepository';
 import { createMockTraderRepository } from '../../application/support/mockTraderRepository';
@@ -76,6 +80,56 @@ describe('Scheduler per-trader isolation', () => {
     expect(traderRepository.saveTraderMetrics).toHaveBeenCalledTimes(2); // only A and C persisted
     expect(onTraderError).toHaveBeenCalledTimes(1);
     expect(onTraderError).toHaveBeenCalledWith('recompute', 'B', expect.any(Error));
+  });
+
+  it('snapshots the consensus after recompute when a snapshot application is configured', async () => {
+    const traderRepository = createMockTraderRepository();
+    vi.mocked(traderRepository.findAllTraderKeys).mockResolvedValue([
+      { provider: Provider.Hyperliquid, address: 'A' },
+    ]);
+    const positionRepository = createMockPositionRepository();
+    const consensusSnapshots = createMockConsensusSnapshotRepository();
+    const snapshotConsensusApplication = new SnapshotConsensusApplication(
+      new SnapshotConsensusService(
+        new SafeCohortConsensusService(traderRepository, positionRepository, {
+          freshnessWindowMilliseconds: 60_000,
+        }),
+        consensusSnapshots,
+      ),
+    );
+    const scheduler = new Scheduler(
+      {
+        providers: [
+          {
+            provider: Provider.Hyperliquid,
+            syncLeaderboardApplication: new SyncLeaderboardApplication(
+              new SyncLeaderboardService(createMockHyperliquidProxy(), traderRepository),
+            ),
+            pollTraderApplication: new PollTraderApplication(
+              new PollTraderService(createMockHyperliquidProxy(), positionRepository, {
+                lookbackMilliseconds: 1000,
+              }),
+            ),
+          },
+        ],
+        recomputeTraderMetricsApplication: new RecomputeTraderMetricsApplication(
+          new RecomputeTraderMetricsService(positionRepository, traderRepository),
+        ),
+        traderRepository,
+        snapshotConsensusApplication,
+      },
+      {
+        connection: { host: '127.0.0.1', port: 6379 },
+        syncIntervalMs: 1000,
+        pollIntervalMs: 1000,
+        recomputeIntervalMs: 1000,
+        onTraderError: vi.fn(),
+      },
+    );
+
+    await scheduler.recomputeAllTraders();
+
+    expect(consensusSnapshots.saveConsensusSnapshots).toHaveBeenCalledTimes(1);
   });
 
   it('runs sync then poll then recompute once on the initial cycle', async () => {
