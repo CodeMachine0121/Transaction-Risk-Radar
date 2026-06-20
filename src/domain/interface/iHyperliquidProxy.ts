@@ -1,6 +1,6 @@
 import type { LeaderboardTrader } from '../vo/leaderboardTrader';
 import type { OpenPosition } from '../vo/openPosition';
-import type { TraderFill } from '../vo/traderFill';
+import type { TraderActivity } from '../vo/traderActivity';
 
 /**
  * 封裝 Hyperliquid 公開讀取 API（leaderboard / clearinghouseState / userFillsByTime）。
@@ -9,5 +9,5 @@ import type { TraderFill } from '../vo/traderFill';
 export interface IHyperliquidProxy {
   fetchLeaderboard(): Promise<LeaderboardTrader[]>;
   fetchOpenPositions(address: string): Promise<OpenPosition[]>;
-  fetchUserFills(address: string, startTime: number): Promise<TraderFill[]>;
+  fetchUserFills(address: string, startTime: number): Promise<TraderActivity[]>;
 }

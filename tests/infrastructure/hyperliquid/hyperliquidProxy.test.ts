@@ -90,15 +90,16 @@ describe('HyperliquidProxy', () => {
       ]),
     );
 
-    const fills = await buildProxy(fetchMock).fetchUserFills('0xabc', 1681222254000);
+    const activities = await buildProxy(fetchMock).fetchUserFills('0xabc', 1681222254000);
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(requestBody.type).toBe('userFillsByTime');
     expect(requestBody.user).toBe('0xabc');
     expect(requestBody.startTime).toBe(1681222254000);
-    expect(fills[0]?.side).toBe('buy');
-    expect(fills[0]?.price.toString()).toBe('18.435');
-    expect(fills[0]?.tradeId).toBe(118906512037719);
+    expect(activities[0]?.signedSize.toString()).toBe('93.53'); // side 'B' → 正
+    expect(activities[0]?.price.toString()).toBe('18.435');
+    expect(activities[0]?.signedSizeBefore.toString()).toBe('26.86');
+    expect(activities[0]?.sourceReference).toBe('118906512037719');
   });
 
   it('throws when the info endpoint responds with a non-ok status', async () => {

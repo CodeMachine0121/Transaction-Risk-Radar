@@ -2,7 +2,7 @@
 // 命名遵循 .sdd/UL-MAP.md：model PascalCase、欄位 camelCase，對應 DB 為 snake_case 全名。
 // 金額 / 報酬率一律使用 Decimal，禁用浮點。
 //
-// 持久化模型：存「原始成交（PositionFill）+ 浮虧快照（PositionSnapshot）」，
+// 持久化模型：存「倉位變動腿（PositionActivity）+ 浮虧快照（PositionSnapshot）」，
 // 倉位於讀取時由 domain 的 Position.reconstruct 重建（ingest 無狀態）。
 
 generator client {
@@ -13,11 +13,6 @@ datasource db {
   // Prisma 7：連線 URL 移至 prisma.config.ts（供 Migrate/CLI），
   // 執行時透過 @prisma/adapter-pg driver adapter 連線。
   provider = "postgresql"
-}
-
-enum FillSide {
-  buy
-  sell
 }
 
 /// 被追蹤分析的鏈上交易員（錢包地址），來源為 Hyperliquid leaderboard。
@@ -31,22 +26,19 @@ model Trader {
   @@map("traders")
 }
 
-/// 一筆原始成交（userFillsByTime）。以 tradeId 去重 (idempotency)；倉位由此重建。
-model PositionFill {
-  tradeId             BigInt   @id @map("trade_id")
-  traderAddress       String   @map("trader_address")
-  coin                String
-  side                FillSide
-  price               Decimal  @db.Decimal(38, 18)
-  size                Decimal  @db.Decimal(38, 18)
-  startPosition       Decimal  @map("start_position") @db.Decimal(38, 18)
-  direction           String
-  closedProfitAndLoss Decimal  @map("closed_profit_and_loss") @db.Decimal(38, 18)
-  occurredAt          DateTime @map("occurred_at")
-  hash                String
+/// 一筆 provider-agnostic 的倉位變動腿。以 sourceReference 去重 (idempotency)；倉位由此重建。
+model PositionActivity {
+  sourceReference       String   @id @map("source_reference")
+  traderAddress         String   @map("trader_address")
+  coin                  String
+  price                 Decimal  @db.Decimal(38, 18)
+  signedSize            Decimal  @map("signed_size") @db.Decimal(38, 18)
+  signedSizeBefore      Decimal  @map("signed_size_before") @db.Decimal(38, 18)
+  realizedProfitAndLoss Decimal  @map("realized_profit_and_loss") @db.Decimal(38, 18)
+  occurredAt            DateTime @map("occurred_at")
 
   @@index([traderAddress, coin, occurredAt])
-  @@map("position_fills")
+  @@map("position_activities")
 }
 
 /// 每次輪詢對開倉拍下的時間切片，依 trader+coin+time 記錄；讀取時依時間窗掛回對應倉位。

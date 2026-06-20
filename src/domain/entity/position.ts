@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 import type { PositionLifecycleEvent } from '../vo/positionLifecycleEvent';
 import type { PositionSide } from '../vo/positionSide';
 import type { PositionSnapshot } from '../vo/positionSnapshot';
-import type { TraderFill } from '../vo/traderFill';
+import type { TraderActivity } from '../vo/traderActivity';
 
 const ZERO = new Decimal(0);
 const HUNDRED = new Decimal(100);
@@ -130,15 +130,15 @@ export class Position {
    * 靜態工廠：把成交重建為倉位（依標的分組、按時間排序、逐筆分類 open/add/reduce/close；
    * 持倉歸零即閉倉、反向穿越視為「平舊倉＋開新倉」）。回傳的倉位尚未含 snapshot。
    */
-  static reconstruct(fills: TraderFill[]): Position[] {
-    const reconstructCoin = (coin: string, coinFills: TraderFill[]): Position[] => {
-      const ordered = [...coinFills].sort((left, right) => left.timestamp - right.timestamp);
+  static reconstruct(activities: TraderActivity[]): Position[] {
+    const reconstructCoin = (coin: string, coinActivities: TraderActivity[]): Position[] => {
+      const ordered = [...coinActivities].sort((left, right) => left.occurredAt - right.occurredAt);
       const coinPositions: Position[] = [];
       let events: PositionLifecycleEvent[] = [];
-      // 以第一筆 fill 的 startPosition 起算持倉量：抓取窗常從持倉中途開始，
+      // 以第一筆腿的 signedSizeBefore 起算持倉量：抓取窗常從持倉中途開始，
       // 若仍從 0 起算則持倉永遠回不到真正的 0、永遠偵測不到平倉。
-      let running = ordered[0]?.startPosition ?? ZERO;
-      // 期初已持有（startPosition 非零）= 開倉於窗外、進場價未知，視為 carried：
+      let running = ordered[0]?.signedSizeBefore ?? ZERO;
+      // 期初已持有（signedSizeBefore 非零）= 開倉於窗外、進場價未知，視為 carried：
       // 統計時排除（不計入已平倉位），只計窗內完整開→平的倉位。
       let carried = !running.isZero();
       let side: PositionSide = running.isPositive() ? 'long' : 'short';
@@ -169,35 +169,36 @@ export class Position {
         closedAt = null;
       };
 
-      for (const fill of ordered) {
-        const signedDelta = fill.side === 'buy' ? fill.size : fill.size.negated();
+      for (const activity of ordered) {
+        const signedDelta = activity.signedSize;
+        const size = activity.signedSize.abs();
         const before = running;
         const after = before.plus(signedDelta);
 
         if (!open) {
           side = after.isPositive() ? 'long' : 'short';
-          events.push({ type: 'open', price: fill.price, size: fill.size });
-          openedAt = fill.timestamp;
+          events.push({ type: 'open', price: activity.price, size });
+          openedAt = activity.occurredAt;
           open = true;
         } else if (!sameSign(before, after) && !after.isZero()) {
-          events.push({ type: 'close', price: fill.price, size: before.abs() });
-          realizedProfitAndLoss = realizedProfitAndLoss.plus(fill.closedProfitAndLoss);
-          closedAt = fill.timestamp;
+          events.push({ type: 'close', price: activity.price, size: before.abs() });
+          realizedProfitAndLoss = realizedProfitAndLoss.plus(activity.realizedProfitAndLoss);
+          closedAt = activity.occurredAt;
           finalize(true);
           side = after.isPositive() ? 'long' : 'short';
-          events.push({ type: 'open', price: fill.price, size: after.abs() });
-          openedAt = fill.timestamp;
+          events.push({ type: 'open', price: activity.price, size: after.abs() });
+          openedAt = activity.occurredAt;
           open = true;
         } else if (after.abs().greaterThan(before.abs())) {
-          events.push({ type: 'add', price: fill.price, size: fill.size });
+          events.push({ type: 'add', price: activity.price, size });
         } else {
-          realizedProfitAndLoss = realizedProfitAndLoss.plus(fill.closedProfitAndLoss);
+          realizedProfitAndLoss = realizedProfitAndLoss.plus(activity.realizedProfitAndLoss);
           if (after.isZero()) {
-            events.push({ type: 'close', price: fill.price, size: fill.size });
-            closedAt = fill.timestamp;
+            events.push({ type: 'close', price: activity.price, size });
+            closedAt = activity.occurredAt;
             finalize(true);
           } else {
-            events.push({ type: 'reduce', price: fill.price, size: fill.size });
+            events.push({ type: 'reduce', price: activity.price, size });
           }
         }
         running = after;
@@ -209,15 +210,15 @@ export class Position {
       return coinPositions;
     };
 
-    const fillsByCoin = new Map<string, TraderFill[]>();
-    for (const fill of fills) {
-      const existing = fillsByCoin.get(fill.coin) ?? [];
-      existing.push(fill);
-      fillsByCoin.set(fill.coin, existing);
+    const activitiesByCoin = new Map<string, TraderActivity[]>();
+    for (const activity of activities) {
+      const existing = activitiesByCoin.get(activity.coin) ?? [];
+      existing.push(activity);
+      activitiesByCoin.set(activity.coin, existing);
     }
     const positions: Position[] = [];
-    for (const [coin, coinFills] of fillsByCoin) {
-      positions.push(...reconstructCoin(coin, coinFills));
+    for (const [coin, coinActivities] of activitiesByCoin) {
+      positions.push(...reconstructCoin(coin, coinActivities));
     }
     return positions;
   }

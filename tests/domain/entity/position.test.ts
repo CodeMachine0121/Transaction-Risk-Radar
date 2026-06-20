@@ -4,7 +4,7 @@ import { Position } from '@/domain/entity/position';
 import type { PositionLifecycleEvent } from '@/domain/vo/positionLifecycleEvent';
 import type { PositionSnapshot } from '@/domain/vo/positionSnapshot';
 import type { PositionSide } from '@/domain/vo/positionSide';
-import type { TraderFill } from '@/domain/vo/traderFill';
+import type { TraderActivity } from '@/domain/vo/traderActivity';
 
 const fill = (spec: {
   side: 'buy' | 'sell';
@@ -14,18 +14,18 @@ const fill = (spec: {
   closedPnl?: number;
   coin?: string;
   startPosition?: number;
-}): TraderFill => ({
-  coin: spec.coin ?? 'ETH',
-  price: new Decimal(spec.price),
-  size: new Decimal(spec.size),
-  side: spec.side,
-  timestamp: spec.time,
-  startPosition: new Decimal(spec.startPosition ?? 0),
-  direction: '',
-  closedProfitAndLoss: new Decimal(spec.closedPnl ?? 0),
-  tradeId: spec.time,
-  hash: '',
-});
+}): TraderActivity => {
+  const size = new Decimal(spec.size);
+  return {
+    coin: spec.coin ?? 'ETH',
+    price: new Decimal(spec.price),
+    signedSize: spec.side === 'buy' ? size : size.negated(),
+    signedSizeBefore: new Decimal(spec.startPosition ?? 0),
+    realizedProfitAndLoss: new Decimal(spec.closedPnl ?? 0),
+    occurredAt: spec.time,
+    sourceReference: String(spec.time),
+  };
+};
 
 const event = (
   type: PositionLifecycleEvent['type'],

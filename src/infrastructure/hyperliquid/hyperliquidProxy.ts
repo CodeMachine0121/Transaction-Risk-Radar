@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 import type { IHyperliquidProxy } from '../../domain/interface/iHyperliquidProxy';
 import type { LeaderboardTrader } from '../../domain/vo/leaderboardTrader';
 import type { OpenPosition } from '../../domain/vo/openPosition';
-import type { TraderFill } from '../../domain/vo/traderFill';
+import type { TraderActivity } from '../../domain/vo/traderActivity';
 import type { RequestWeightLimiter } from '../../shared/rateLimit/requestWeightLimiter';
 import type { RawClearinghouseState, RawFill, RawLeaderboardResponse } from './hyperliquidWire';
 
@@ -96,7 +96,7 @@ export class HyperliquidProxy implements IHyperliquidProxy {
     }));
   }
 
-  async fetchUserFills(address: string, startTime: number): Promise<TraderFill[]> {
+  async fetchUserFills(address: string, startTime: number): Promise<TraderActivity[]> {
     const data = await this.postInfo<RawFill[]>(
       {
         type: 'userFillsByTime',
@@ -105,18 +105,18 @@ export class HyperliquidProxy implements IHyperliquidProxy {
       },
       defaultRequestWeights.userFillsByTime,
     );
-    return data.map((fill) => ({
-      coin: fill.coin,
-      price: new Decimal(fill.px),
-      size: new Decimal(fill.sz),
-      side: fill.side === 'B' ? 'buy' : 'sell',
-      timestamp: fill.time,
-      startPosition: new Decimal(fill.startPosition),
-      direction: fill.dir,
-      closedProfitAndLoss: new Decimal(fill.closedPnl),
-      tradeId: fill.tid,
-      hash: fill.hash,
-    }));
+    return data.map((fill) => {
+      const size = new Decimal(fill.sz);
+      return {
+        coin: fill.coin,
+        price: new Decimal(fill.px),
+        signedSize: fill.side === 'B' ? size : size.negated(),
+        signedSizeBefore: new Decimal(fill.startPosition),
+        realizedProfitAndLoss: new Decimal(fill.closedPnl),
+        occurredAt: fill.time,
+        sourceReference: String(fill.tid),
+      };
+    });
   }
 
   private async postInfo<TResponse>(requestBody: object, weight: number): Promise<TResponse> {

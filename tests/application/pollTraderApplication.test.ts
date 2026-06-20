@@ -5,7 +5,7 @@ import { PollTraderService } from '@/domain/service/pollTraderService';
 import type { IHyperliquidProxy } from '@/domain/interface/iHyperliquidProxy';
 import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
 import type { OpenPosition } from '@/domain/vo/openPosition';
-import type { TraderFill } from '@/domain/vo/traderFill';
+import type { TraderActivity } from '@/domain/vo/traderActivity';
 import { createMockHyperliquidProxy } from './support/mockHyperliquidProxy';
 import { createMockPositionRepository } from './support/mockPositionRepository';
 
@@ -19,17 +19,14 @@ const openPosition = (): OpenPosition => ({
   marginUsed: new Decimal(20),
 });
 
-const fill = (): TraderFill => ({
+const fill = (): TraderActivity => ({
   coin: 'ETH',
   price: new Decimal(100),
-  size: new Decimal(1),
-  side: 'buy',
-  timestamp: 1,
-  startPosition: new Decimal(0),
-  direction: 'Open Long',
-  closedProfitAndLoss: new Decimal(0),
-  tradeId: 1,
-  hash: '0x',
+  signedSize: new Decimal(1),
+  signedSizeBefore: new Decimal(0),
+  realizedProfitAndLoss: new Decimal(0),
+  occurredAt: 1,
+  sourceReference: '1',
 });
 
 const buildApplication = (
@@ -40,11 +37,11 @@ const buildApplication = (
   new PollTraderApplication(new PollTraderService(proxy, positionRepository, options));
 
 describe('PollTraderApplication', () => {
-  it('fetches fills since the latest observed fill timestamp and saves them', async () => {
+  it('fetches activities since the latest observed timestamp and saves them', async () => {
     const proxy = createMockHyperliquidProxy();
     vi.mocked(proxy.fetchUserFills).mockResolvedValue([fill()]);
     const positionRepository = createMockPositionRepository();
-    vi.mocked(positionRepository.latestObservedFillTimestamp).mockResolvedValue(5000);
+    vi.mocked(positionRepository.latestActivityTimestamp).mockResolvedValue(5000);
     const application = buildApplication(proxy, positionRepository, {
       lookbackMilliseconds: 3000,
     });
@@ -52,13 +49,13 @@ describe('PollTraderApplication', () => {
     await application.poll('0xA');
 
     expect(proxy.fetchUserFills).toHaveBeenCalledWith('0xA', 5000);
-    expect(positionRepository.saveFills).toHaveBeenCalledWith('0xA', [fill()]);
+    expect(positionRepository.saveActivities).toHaveBeenCalledWith('0xA', [fill()]);
   });
 
   it('falls back to now minus lookback when there is no prior fill', async () => {
     const proxy = createMockHyperliquidProxy();
     const positionRepository = createMockPositionRepository();
-    vi.mocked(positionRepository.latestObservedFillTimestamp).mockResolvedValue(null);
+    vi.mocked(positionRepository.latestActivityTimestamp).mockResolvedValue(null);
     const application = buildApplication(proxy, positionRepository, {
       lookbackMilliseconds: 3000,
       now: () => 10000,

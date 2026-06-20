@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type {
-  PositionFill as PositionFillRow,
+  PositionActivity as PositionActivityRow,
   PositionSnapshot as PositionSnapshotRow,
   PrismaClient,
 } from '@prisma/client';
@@ -8,23 +8,20 @@ import { Position } from '../../domain/entity/position';
 import type { IPositionRepository } from '../../domain/interface/iPositionRepository';
 import type { PositionSnapshot } from '../../domain/vo/positionSnapshot';
 import type { PositionSnapshotRecord } from '../../domain/vo/positionSnapshotRecord';
-import type { TraderFill } from '../../domain/vo/traderFill';
+import type { TraderActivity } from '../../domain/vo/traderActivity';
 
-const toTraderFill = (row: PositionFillRow): TraderFill => ({
+const toTraderActivity = (row: PositionActivityRow): TraderActivity => ({
   coin: row.coin,
   price: new Decimal(row.price.toString()),
-  size: new Decimal(row.size.toString()),
-  side: row.side,
-  timestamp: row.occurredAt.getTime(),
-  startPosition: new Decimal(row.startPosition.toString()),
-  direction: row.direction,
-  closedProfitAndLoss: new Decimal(row.closedProfitAndLoss.toString()),
-  tradeId: Number(row.tradeId),
-  hash: row.hash,
+  signedSize: new Decimal(row.signedSize.toString()),
+  signedSizeBefore: new Decimal(row.signedSizeBefore.toString()),
+  realizedProfitAndLoss: new Decimal(row.realizedProfitAndLoss.toString()),
+  occurredAt: row.occurredAt.getTime(),
+  sourceReference: row.sourceReference,
 });
 
 /**
- * Repository（Position entity）：寫入原始成交（去重）與浮虧快照；
+ * Repository（Position entity）：寫入倉位變動腿（去重）與浮虧快照；
  * 讀取時以 Position.reconstruct 重建倉位，再依「標的 + 時間窗」掛回 snapshot。
  */
 export class PositionRepository implements IPositionRepository {
@@ -34,25 +31,22 @@ export class PositionRepository implements IPositionRepository {
     this.prismaClient = prismaClient;
   }
 
-  async saveFills(traderAddress: string, fills: TraderFill[]): Promise<void> {
-    if (fills.length === 0) {
+  async saveActivities(traderAddress: string, activities: TraderActivity[]): Promise<void> {
+    if (activities.length === 0) {
       return;
     }
-    await this.prismaClient.positionFill.createMany({
-      data: fills.map((fill) => ({
-        tradeId: BigInt(fill.tradeId),
+    await this.prismaClient.positionActivity.createMany({
+      data: activities.map((activity) => ({
+        sourceReference: activity.sourceReference,
         traderAddress,
-        coin: fill.coin,
-        side: fill.side,
-        price: fill.price.toString(),
-        size: fill.size.toString(),
-        startPosition: fill.startPosition.toString(),
-        direction: fill.direction,
-        closedProfitAndLoss: fill.closedProfitAndLoss.toString(),
-        occurredAt: new Date(fill.timestamp),
-        hash: fill.hash,
+        coin: activity.coin,
+        price: activity.price.toString(),
+        signedSize: activity.signedSize.toString(),
+        signedSizeBefore: activity.signedSizeBefore.toString(),
+        realizedProfitAndLoss: activity.realizedProfitAndLoss.toString(),
+        occurredAt: new Date(activity.occurredAt),
       })),
-      skipDuplicates: true, // 以 tradeId (PK) 去重
+      skipDuplicates: true, // 以 sourceReference (PK) 去重
     });
   }
 
@@ -74,8 +68,8 @@ export class PositionRepository implements IPositionRepository {
     });
   }
 
-  async latestObservedFillTimestamp(traderAddress: string): Promise<number | null> {
-    const result = await this.prismaClient.positionFill.aggregate({
+  async latestActivityTimestamp(traderAddress: string): Promise<number | null> {
+    const result = await this.prismaClient.positionActivity.aggregate({
       where: { traderAddress },
       _max: { occurredAt: true },
     });
@@ -83,11 +77,11 @@ export class PositionRepository implements IPositionRepository {
   }
 
   async findPositions(traderAddress: string): Promise<Position[]> {
-    const fillRows = await this.prismaClient.positionFill.findMany({
+    const activityRows = await this.prismaClient.positionActivity.findMany({
       where: { traderAddress },
       orderBy: { occurredAt: 'asc' },
     });
-    const positions = Position.reconstruct(fillRows.map(toTraderFill));
+    const positions = Position.reconstruct(activityRows.map(toTraderActivity));
 
     const snapshotRows = await this.prismaClient.positionSnapshot.findMany({
       where: { traderAddress },

@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import type { IHyperliquidProxy } from '@/domain/interface/iHyperliquidProxy';
 import type { LeaderboardTrader } from '@/domain/vo/leaderboardTrader';
 import type { OpenPosition } from '@/domain/vo/openPosition';
-import type { TraderFill } from '@/domain/vo/traderFill';
+import type { TraderActivity } from '@/domain/vo/traderActivity';
 
 /** 以 vi.fn 建立 IHyperliquidProxy 的 mock（預設皆回空陣列）。 */
 export const createMockHyperliquidProxy = (): IHyperliquidProxy => ({
@@ -11,6 +11,6 @@ export const createMockHyperliquidProxy = (): IHyperliquidProxy => ({
     .fn<(traderAddress: string) => Promise<OpenPosition[]>>()
     .mockResolvedValue([]),
   fetchUserFills: vi
-    .fn<(traderAddress: string, startTime: number) => Promise<TraderFill[]>>()
+    .fn<(traderAddress: string, startTime: number) => Promise<TraderActivity[]>>()
     .mockResolvedValue([]),
 });
