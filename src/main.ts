@@ -1,3 +1,4 @@
+import { PositionRepository } from './infrastructure/persistence/positionRepository';
 import { createPrismaClient } from './infrastructure/persistence/prismaClient';
 import { TraderRepository } from './infrastructure/persistence/traderRepository';
 import { buildServer } from './server';
@@ -6,7 +7,12 @@ import { buildServer } from './server';
 const connectionString = process.env.DATABASE_URL ?? '';
 const prismaClient = createPrismaClient(connectionString);
 const repository = new TraderRepository(prismaClient);
-const server = buildServer(repository, { logger: true });
+const positionRepository = new PositionRepository(prismaClient);
+const pollIntervalMilliseconds = Number(process.env.POLL_INTERVAL_MS ?? `${30 * 1000}`);
+const server = buildServer(repository, positionRepository, {
+  logger: true,
+  consensusFreshnessWindowMilliseconds: 2 * pollIntervalMilliseconds,
+});
 
 const port = Number(process.env.PORT ?? '3000');
 

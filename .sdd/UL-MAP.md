@@ -48,6 +48,14 @@ _Records entities, value objects, attributes and their correspondence between co
 | 資料來源 Provider              | `provider`（**enum**）                | —                           | 交易資料的來源場所，以 **enum** 表示（`hyperliquid` / `okx`…）。為 `Trader` entity 的一個欄位；與 address 共同構成唯一識別 `(provider, address)`（EVM 場所共用 0x 會撞號）。 | Confirmed                      |
 | 帶單員 Lead Trader             | `leadTrader`（`uniqueCode`）          | Lead Trader                 | OKX copy-trading 上可被跟單的交易員，以 `uniqueCode` 識別（在 `(provider, address)` 模型中放入 address 欄位）。                                     | Confirmed                      |
 | 子倉位 Sub-position            | `subPosition`（`subPosId`）           | —                           | OKX copy-trading 中帶單員「**每張開倉單**」對應的一筆倉位記錄（含 `openAvgPx`/`openTime`/`openOrdId`）。分批加倉＝多筆 sub-position，可重建加倉路徑（攤平偵測依據）。 | Confirmed                      |
+| 安全群持倉共識 Safe Cohort Consensus | `safeCohortConsensus` | Safe Cohort Consensus | 在 riskScore 判定相對安全可跟（`tier=position`、非 `insufficientData`、`riskScore ≤ maxRiskScore`）的交易員群體中，聚合其**當前未平倉**方向的描述性共識。**非買賣建議、非價格預測。** | Confirmed |
+| 淨方向偏向 Net Direction Bias | `netDirectionBias` | Net Direction Bias | `Σ(side × weight) / Σ(weight)`，落在 −1…+1（`long=+1`/`short=−1`）；`weight = clamp(1 − riskScore/100, 0, 1)`。安全群於某 coin 的加權淨多空。 | Confirmed |
+| 共識強度 Consensus Strength | `consensusStrength` | Consensus Strength | `\|netDirectionBias\|`（0…1）；越高代表安全群方向越一致。 | Confirmed |
+| 同向參與佔比 Long Share | `longShareOfParticipants` | Long Share | `longCount / participantCount`，安全群中做多者佔比（輔助直覺欄）。 | Confirmed |
+| 安全群門檻 Max Risk Score | `maxRiskScore` | — | 納入共識群體的 riskScore 上限（可設定，v1 預設 40）。 | Confirmed |
+| 最小共識人數 Minimum Consensus Participants | `minimumConsensusParticipants` | — | 某 coin 至少需幾位安全交易員才輸出共識（可設定，v1 預設 3），避免單人「共識」。 | Confirmed |
+| 共識新鮮度窗 Consensus Freshness Window | `consensusFreshnessWindow` | — | 快照須落在此窗內才算「當前持倉」（可設定，v1 預設 `2 × POLL_INTERVAL_MS`）；逾窗視為非當前。 | Confirmed |
+| 快照帶號持倉量 Snapshot Signed Size | `signedSize`（於 `position_snapshots`） | — | 快照保留的帶號持倉量（正=多、負=空），供「當前未平倉方向」判定；`pollTrader` 不再取絕對值。 | Confirmed |
 
 ---
 
@@ -74,6 +82,9 @@ _Records business operations, function logic, and their corresponding business a
 | 增量輪詢成交 Poll Fills Incrementally | `pollTraderFillsSinceLatest`          | 分層排程                     | 以 `latestObservedFillTimestamp` 作 `startTime` 增量抓 fills，不再每輪重抓 90 天 | 無歷史成交者退回首次 lookback     |
 | 攝取交易員資料（多源） Ingest Trader Data | `ingestTraderData`                  | per-provider 排程               | 由各 provider 的 proxy 取得名單/成交/部位，正規化成共用 domain VO（HL 走 fills、OKX 走 sub-positions） | 每個 provider 一條 sync→poll→recompute |
 | 由子倉位重建倉位 Reconstruct from Sub-positions | `reconstructPositionsFromSubPositions` | OKX recompute             | 把同標的的多筆 sub-position 依 `openTime` 排序為加倉序列，重建邏輯倉位（供攤平/勝率/報酬率） | 對應 HL 的 `reconstructPositions`（fills） |
+| 查詢安全群共識 Query Safe Cohort Consensus | `getSafeCohortConsensus` (`GET /consensus`) | 使用者呼叫 REST API | 回傳各 coin 的安全群持倉共識，依 `consensusStrength` 排序、分頁 | 描述性、非建議；附免責 |
+| 查詢單一標的共識 Query Coin Consensus | `getCoinConsensus` (`GET /consensus/:coin`) | 使用者呼叫 REST API | 回傳單一 coin 的安全群共識細節 | 404 若無足量共識 |
+| 計算安全群共識 Compute Safe Cohort Consensus | `computeSafeCohortConsensus` | 使用者呼叫時即時聚合 | 取安全群最新且在新鮮度窗內的快照，加權聚合每 coin 的 `netDirectionBias` 等 | 跨多 entity → Domain Service |
 
 ---
 

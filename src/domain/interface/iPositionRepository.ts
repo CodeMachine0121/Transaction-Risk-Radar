@@ -1,4 +1,5 @@
 import type { Position } from '../entity/position';
+import type { CurrentOpenPosition } from '../vo/currentOpenPosition';
 import type { PositionSnapshotRecord } from '../vo/positionSnapshotRecord';
 import type { Provider } from '../vo/provider';
 import type { TraderActivity } from '../vo/traderActivity';
@@ -21,4 +22,13 @@ export interface IPositionRepository {
   findPositions(provider: Provider, traderAddress: string): Promise<Position[]>;
   /** 該交易員已落庫變動腿的最新時間（ms epoch）；無則回傳 null。供 high-watermark 增量抓取。 */
   latestActivityTimestamp(provider: Provider, traderAddress: string): Promise<number | null>;
+  /**
+   * 安全群當前未平倉：每位交易員每個 coin 取「最新且 `capturedAt ≥ freshAfter`」的快照，
+   * 排除 `signedSize = 0`（已平倉）。供共識聚合判定當前持倉方向。
+   */
+  findCurrentOpenPositions(
+    provider: Provider,
+    traderAddresses: string[],
+    freshAfter: number,
+  ): Promise<CurrentOpenPosition[]>;
 }

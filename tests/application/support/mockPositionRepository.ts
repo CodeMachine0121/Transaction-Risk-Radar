@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type { Position } from '@/domain/entity/position';
 import type { IPositionRepository } from '@/domain/interface/iPositionRepository';
+import type { CurrentOpenPosition } from '@/domain/vo/currentOpenPosition';
 import type { PositionSnapshotRecord } from '@/domain/vo/positionSnapshotRecord';
 import type { Provider } from '@/domain/vo/provider';
 import type { TraderActivity } from '@/domain/vo/traderActivity';
@@ -24,4 +25,13 @@ export const createMockPositionRepository = (): IPositionRepository => ({
   latestActivityTimestamp: vi
     .fn<(provider: Provider, traderAddress: string) => Promise<number | null>>()
     .mockResolvedValue(null),
+  findCurrentOpenPositions: vi
+    .fn<
+      (
+        provider: Provider,
+        traderAddresses: string[],
+        freshAfter: number,
+      ) => Promise<CurrentOpenPosition[]>
+    >()
+    .mockResolvedValue([]),
 });
