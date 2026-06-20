@@ -67,6 +67,10 @@ synchronizeLeaderboard ──▶ traders
    getRiskRanking / getTraderDetail  (REST API)
 ```
 
+### 排程行為 — 啟動即跑一輪
+
+背景 worker 啟動時**立即依序跑一輪** `synchronizeLeaderboard → pollTrader → recomputeTraderMetrics`，之後才進入各自的定時輪詢（`SYNC_INTERVAL_MS` / `POLL_INTERVAL_MS` / `RECOMPUTE_INTERVAL_MS`）。如此排行不必等第一個 interval（預設 leaderboard 同步為 1 小時）才有資料。初始這輪的 leaderboard 同步若失敗，**只回報、不中斷啟動**，poll/recompute 該輪略過，交由定時排程於下一個 interval 重試。
+
 ### Core Business Rules — 指標計算口徑
 
 **時間窗：** 盈虧、勝率、下行標準差皆採用**近 90 天**已平倉位。

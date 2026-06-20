@@ -3,7 +3,7 @@
 **Project:** Trader Risk Radar
 **Bounded Context:** Hyperliquid 鏈上永續合約交易員的風險分析與排行
 **Maintainer:** James (james.hsueh@cafler.com)
-**Last Updated:** 2026-06-19
+**Last Updated:** 2026-06-20
 
 > **命名慣例：所有 Technical Name 與程式識別字一律使用全名，禁止縮寫。**
 > 程式碼識別字用 camelCase 全名（如 `maxAdverseExcursion`）；資料庫表 / 欄位用 snake_case 全名（如 `position_events`、`unrealized_profit_and_loss_percentage`）。領域術語欄位（Domain Term）可保留人類習慣的簡稱（如 MAE）作閱讀用，但其對應識別字必為全名。
@@ -38,6 +38,10 @@ _Records entities, value objects, attributes and their correspondence between co
 | 標的 Coin                      | `coin`                                | Coin                        | 永續合約交易標的（如 BTC、ETH）。                                                                                                               | Confirmed                      |
 | 槓桿 Leverage                  | `leverage`                            | Leverage                    | 倉位的名目槓桿倍數。                                                                                                                            | Confirmed                      |
 | 保證金 Margin                  | `margin`                              | Margin                      | 倉位所佔用的保證金。                                                                                                                            | Confirmed                      |
+| 請求權重 Request Weight        | `requestWeight`                       | —                           | Hyperliquid `/info` 每個請求的權重；不同請求類型權重不同（如 `clearinghouseState` 輕、`userFillsByTime` 重）。                                  | Confirmed                      |
+| 權重預算 Weight Budget         | `requestWeightBudget`                 | —                           | per-IP 每分鐘可用的 aggregate weight 上限（約 1200，動工前對官方 docs 校準）。token bucket 以此速率回填。                                       | Confirmed                      |
+| 交易員輪詢分層 Polling Tier    | `traderPollingTier`                   | —                           | 依 leaderboard `accountValue` 將交易員分層，決定輪詢頻率（高排名勤、長尾鬆）。                                                                  | Confirmed                      |
+| 最後成交時間 Latest Fill Time  | `latestObservedFillTimestamp`         | —                           | 每位交易員已落庫成交的最新 `occurredAt`，作 high-watermark 增量抓取的 `startTime`。由 `PositionFill.max(occurredAt)` 推導，不另存欄位。         | Confirmed                      |
 
 ---
 
@@ -57,6 +61,9 @@ _Records business operations, function logic, and their corresponding business a
 | 計算風險分數                    | `computeRiskScore`                          | 分析引擎排程                 | 加權組合各指標為 `riskScore`，供排行排序                                       | 權重見 PRD 第 4 章               |
 | 查詢風險排行 Query Risk Ranking | `getRiskRanking` (`GET /rankings`)          | 使用者呼叫 REST API          | 回傳依 riskScore 排序的交易員列表                                              | 支援排序/分頁                    |
 | 查詢交易員詳情 Query Trader     | `getTraderDetail` (`GET /traders/:address`) | 使用者呼叫 REST API          | 回傳單一交易員的完整指標、攤平標記、MAE                                        |                                  |
+| 依權重限流 Throttle by Weight   | `throttleByRequestWeight`                   | 每次 `/info` 請求前          | 依請求 weight 取 token；額度不足時 block-and-wait 等回填，結構性壓在預算內     | token bucket，行程內（單一 worker/IP） |
+| 限流退避重試 Backoff on 429     | `retryWithBackoffOnTooManyRequests`         | 收到 HTTP 429                | 讀 `Retry-After`，exponential backoff + jitter 重試（含上限），取代直接 throw | 限 `/info`；leaderboard 亦適用退避但不計 weight |
+| 增量輪詢成交 Poll Fills Incrementally | `pollTraderFillsSinceLatest`          | 分層排程                     | 以 `latestObservedFillTimestamp` 作 `startTime` 增量抓 fills，不再每輪重抓 90 天 | 無歷史成交者退回首次 lookback     |
 
 ---
 

@@ -8,7 +8,7 @@ export class PollTraderApplication {
     this.pollTraderService = pollTraderService;
   }
 
-  poll(traderAddress: string, fillsSince: number): Promise<void> {
-    return this.pollTraderService.poll(traderAddress, fillsSince);
+  poll(traderAddress: string): Promise<void> {
+    return this.pollTraderService.poll(traderAddress);
   }
 }

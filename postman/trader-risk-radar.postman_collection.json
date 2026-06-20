@@ -1,0 +1,94 @@
+{
+  "info": {
+    "name": "Trader Risk Radar",
+    "description": "Hyperliquid 交易員風險分析 + 排行 REST API。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `traderAddress`：查詢交易員詳情用的鏈上地址（請替換為 /rankings 回傳的實際 address）",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "traderAddress",
+      "value": "0x0000000000000000000000000000000000000000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        },
+        "description": "存活檢查。回傳 {\"status\":\"ok\"}。"
+      },
+      "response": []
+    },
+    {
+      "name": "Risk Ranking",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/rankings?direction=descending&offset=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["rankings"],
+          "query": [
+            {
+              "key": "direction",
+              "value": "descending",
+              "description": "排序方向：descending（riskScore 高→低，預設）或 ascending。"
+            },
+            {
+              "key": "offset",
+              "value": "0",
+              "description": "分頁起始位移（整數）。"
+            },
+            {
+              "key": "limit",
+              "value": "20",
+              "description": "回傳筆數上限（整數）。"
+            }
+          ]
+        },
+        "description": "風險導向排行（US-01）。riskScore 衡量「跟單有多危險」，預設由高風險往低排。三個 query 皆為選用。"
+      },
+      "response": []
+    },
+    {
+      "name": "Risk Ranking (defaults, no query)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/rankings",
+          "host": ["{{baseUrl}}"],
+          "path": ["rankings"]
+        },
+        "description": "不帶任何 query，使用伺服器預設排序與分頁。"
+      },
+      "response": []
+    },
+    {
+      "name": "Trader Detail",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/traders/{{traderAddress}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["traders", "{{traderAddress}}"]
+        },
+        "description": "單一交易員風險詳情（US-02）。查無此交易員時回 404 {\"error\":\"trader not found\"}。\n\n先呼叫 Risk Ranking 取得實際 address，再把它填入 collection 變數 traderAddress。"
+      },
+      "response": []
+    }
+  ]
+}

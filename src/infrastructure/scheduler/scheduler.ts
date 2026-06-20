@@ -16,8 +16,6 @@ export type SchedulerOptions = {
   syncIntervalMs: number;
   pollIntervalMs: number;
   recomputeIntervalMs: number;
-  /** poll 抓取成交的回看時間窗（ms）。 */
-  pollLookbackMs: number;
   /** 單一 trader 處理失敗時的回報（不中斷整批）；未提供則寫 stderr。 */
   onTraderError?: (phase: 'poll' | 'recompute', traderAddress: string, error: Error) => void;
 };
@@ -51,11 +49,28 @@ export class Scheduler {
         await this.recomputeAllTraders();
       },
     );
+    // 啟動即跑一輪，排行不必等第一個 interval 才有資料（見 PRD US-03/04/05 驗收）。
+    await this.runInitialCycle();
   }
 
   async stop(): Promise<void> {
     await Promise.all(this.workers.map((worker) => worker.close()));
     await Promise.all(this.queues.map((queue) => queue.close()));
+  }
+
+  /**
+   * 啟動時立即依序跑一輪 sync → poll → recompute，讓排行不必等第一個 interval 才有資料。
+   * sync 失敗只回報、不中斷啟動：repeatable 排程會在下一個 interval 重試。
+   */
+  async runInitialCycle(): Promise<void> {
+    try {
+      await this.applications.syncLeaderboardApplication.sync();
+    } catch (caught) {
+      this.reportSyncError(caught instanceof Error ? caught : new Error(String(caught)));
+      return;
+    }
+    await this.pollAllTraders();
+    await this.recomputeAllTraders();
   }
 
   private async registerRepeatable(
@@ -69,13 +84,12 @@ export class Scheduler {
     await queue.add(name, {}, { repeat: { every: everyMilliseconds } });
   }
 
-  /** 輪詢每位 trader；單一失敗只回報不中斷整批。 */
+  /** 輪詢每位 trader（startTime 由 PollTraderService 以 high-watermark 解析）；單一失敗只回報不中斷整批。 */
   async pollAllTraders(): Promise<void> {
     const addresses = await this.applications.traderRepository.findAllAddresses();
-    const fillsSince = Date.now() - this.options.pollLookbackMs;
     for (const address of addresses) {
       try {
-        await this.applications.pollTraderApplication.poll(address, fillsSince);
+        await this.applications.pollTraderApplication.poll(address);
       } catch (caught) {
         this.reportTraderError(
           'poll',
@@ -112,5 +126,9 @@ export class Scheduler {
       return;
     }
     process.stderr.write(`[scheduler:${phase}] ${traderAddress} failed: ${error.message}\n`);
+  }
+
+  private reportSyncError(error: Error): void {
+    process.stderr.write(`[scheduler:sync] leaderboard sync failed: ${error.message}\n`);
   }
 }

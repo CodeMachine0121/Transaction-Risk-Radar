@@ -74,6 +74,14 @@ export class PositionRepository implements IPositionRepository {
     });
   }
 
+  async latestObservedFillTimestamp(traderAddress: string): Promise<number | null> {
+    const result = await this.prismaClient.positionFill.aggregate({
+      where: { traderAddress },
+      _max: { occurredAt: true },
+    });
+    return result._max.occurredAt?.getTime() ?? null;
+  }
+
   async findPositions(traderAddress: string): Promise<Position[]> {
     const fillRows = await this.prismaClient.positionFill.findMany({
       where: { traderAddress },

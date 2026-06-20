@@ -12,4 +12,7 @@ export const createMockPositionRepository = (): IPositionRepository => ({
     .fn<(traderAddress: string, snapshots: PositionSnapshotRecord[]) => Promise<void>>()
     .mockResolvedValue(undefined),
   findPositions: vi.fn<(traderAddress: string) => Promise<Position[]>>().mockResolvedValue([]),
+  latestObservedFillTimestamp: vi
+    .fn<(traderAddress: string) => Promise<number | null>>()
+    .mockResolvedValue(null),
 });
