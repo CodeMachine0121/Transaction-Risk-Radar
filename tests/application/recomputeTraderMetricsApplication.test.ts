@@ -37,6 +37,46 @@ describe('RecomputeTraderMetricsApplication', () => {
     expect(dto.closedPositionCount).toBe(1);
   });
 
+  it('falls back to account-level risk when position-level is insufficient and account stats exist', async () => {
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findPositions).mockResolvedValue([closedPosition(true)]); // 1 < 20 → 不足
+    const traderRepository = createMockTraderRepository();
+    vi.mocked(traderRepository.findAccountStats).mockResolvedValue({
+      winRatio: new Decimal('0.6'),
+      returnSeries: [new Decimal('10'), new Decimal('-20'), new Decimal('5'), new Decimal('-10')],
+    });
+    const application = new RecomputeTraderMetricsApplication(
+      new RecomputeTraderMetricsService(positionRepository, traderRepository),
+    );
+
+    const dto = await application.recompute(Provider.Okx, 'CODE');
+
+    expect(traderRepository.findAccountStats).toHaveBeenCalledWith(Provider.Okx, 'CODE');
+    expect(dto.tier).toBe('account');
+    expect(dto.insufficientData).toBe(false);
+    expect(dto.riskScore).not.toBeNull();
+  });
+
+  it('keeps position-level tier when position data is sufficient (no fallback)', async () => {
+    const positionRepository = createMockPositionRepository();
+    vi.mocked(positionRepository.findPositions).mockResolvedValue(
+      Array.from({ length: 20 }, (_unused, index) => closedPosition(true, `C${index}`)),
+    );
+    const traderRepository = createMockTraderRepository();
+    vi.mocked(traderRepository.findAccountStats).mockResolvedValue({
+      winRatio: new Decimal('0.6'),
+      returnSeries: [new Decimal('10'), new Decimal('-20')],
+    });
+    const application = new RecomputeTraderMetricsApplication(
+      new RecomputeTraderMetricsService(positionRepository, traderRepository),
+    );
+
+    const dto = await application.recompute(Provider.Okx, 'CODE');
+
+    expect(dto.tier).toBe('position');
+    expect(traderRepository.findAccountStats).not.toHaveBeenCalled();
+  });
+
   it('excludes positions without snapshots from the count', async () => {
     const positionRepository = createMockPositionRepository();
     vi.mocked(positionRepository.findPositions).mockResolvedValue([
