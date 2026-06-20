@@ -258,6 +258,22 @@ export class Trader {
     return this.metrics.insufficientData;
   }
 
+  /**
+   * 安全群共識的投票權重（PRD §4 規則 1）：`clamp(1 − riskScore/100, 0, 1)`。
+   * 越安全（riskScore 越低）票越重。riskScore 為 null 時回 0（cohort 已保證非 null，防呆）。
+   */
+  consensusWeight(): Decimal {
+    const riskScore = this.metrics.riskScore;
+    if (riskScore === null) {
+      return ZERO;
+    }
+    const weight = ONE.minus(riskScore.dividedBy(HUNDRED));
+    if (weight.lessThan(ZERO)) {
+      return ZERO;
+    }
+    return weight.greaterThan(ONE) ? ONE : weight;
+  }
+
   /** 取得彙總指標快照供持久化（由 repository 寫入 trader_metrics）。 */
   metricsSnapshot(): TraderMetrics {
     return this.metrics;

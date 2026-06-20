@@ -202,3 +202,36 @@ describe('Trader.fromAccountStats', () => {
     expect(dto.maxAdverseExcursionPercentile90).toBeNull(); // 非部位級 MAE
   });
 });
+
+describe('Trader.consensusWeight', () => {
+  const withRiskScore = (riskScore: number | null): Trader =>
+    Trader.fromStoredMetrics(Provider.Hyperliquid, '0xA', {
+      riskScoreTier: 'position',
+      maxAdverseExcursionPercentile90: null,
+      averagingDownRatio: null,
+      winRate: null,
+      realizedProfitAndLoss: null,
+      returnDownsideDeviation: null,
+      averageLeverage: null,
+      trapSignal: null,
+      riskScore: riskScore === null ? null : new Decimal(riskScore),
+      closedPositionCount: 25,
+      insufficientData: riskScore === null,
+    });
+
+  it('weights a perfectly safe trader (riskScore 0) at 1', () => {
+    expect(withRiskScore(0).consensusWeight().toString()).toBe('1');
+  });
+
+  it('weights inverse to riskScore (40 → 0.6)', () => {
+    expect(withRiskScore(40).consensusWeight().toString()).toBe('0.6');
+  });
+
+  it('weights the most dangerous trader (riskScore 100) at 0', () => {
+    expect(withRiskScore(100).consensusWeight().toString()).toBe('0');
+  });
+
+  it('returns 0 when riskScore is null (guard; cohort excludes these)', () => {
+    expect(withRiskScore(null).consensusWeight().toString()).toBe('0');
+  });
+});
