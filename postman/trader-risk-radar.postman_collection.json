@@ -1,14 +1,15 @@
 {
   "info": {
     "name": "Trader Risk Radar",
-    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n**風險評分分級（tier，每筆回應皆帶）：**\n- `position`：部位級（精準版）——逐筆部位重建，含 MAE/攤平/槓桿等完整指標；唯一會出現在 /rankings 的等級。\n- `account`：帳戶級（粗版 fallback）——當逐筆部位抓不到（如 OKX 私密帶單員回 60004）但來源提供帳戶彙總（累積報酬曲線 + winRatio）時，以「每期報酬下行標準差 + 帳戶回撤 + 陷阱訊號」估算；**排除於 /rankings**，僅在 /traders 顯示。此級別 MAE/averagingDownRatio/averageLeverage/realizedProfitAndLoss 為 null。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。\n- `accountTierAddress`：一個 OKX 帳戶級（tier=account）交易員的 uniqueCode，供示範 fallback。",
+    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n**風險評分分級（tier，每筆回應皆帶）：**\n- `position`：部位級（精準版）——逐筆部位重建，含 MAE/攤平/槓桿等完整指標；唯一會出現在 /rankings 的等級。\n- `account`：帳戶級（粗版 fallback）——當逐筆部位抓不到（如 OKX 私密帶單員回 60004）但來源提供帳戶彙總（累積報酬曲線 + winRatio）時，以「每期報酬下行標準差 + 帳戶回撤 + 陷阱訊號」估算；**排除於 /rankings**，僅在 /traders 顯示。此級別 MAE/averagingDownRatio/averageLeverage/realizedProfitAndLoss 為 null。\n\n**安全群持倉共識（/consensus）：** 在 riskScore 判定為相對安全可跟的群體（tier=position、非 insufficientData、riskScore ≤ maxRiskScore）中，以 inverse-riskScore 每人一票聚合**當前未平倉**方向，每個 coin 回傳 netDirectionBias(−1…+1)/consensusStrength/參與人數/平均槓桿 + 免責。**描述性，非買賣建議、非價格預測。** 僅 tier=position 參與（OKX account-tier 結構性排除）。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。\n- `accountTierAddress`：一個 OKX 帳戶級（tier=account）交易員的 uniqueCode，供示範 fallback。\n- `coin`：共識查詢的標的（如 BTC / ETH），用於 /consensus/:coin。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
     { "key": "provider", "value": "hyperliquid", "type": "string" },
     { "key": "traderAddress", "value": "0A3CF5287316F730", "type": "string" },
-    { "key": "accountTierAddress", "value": "0A3CF5287316F730", "type": "string" }
+    { "key": "accountTierAddress", "value": "0A3CF5287316F730", "type": "string" },
+    { "key": "coin", "value": "BTC", "type": "string" }
   ],
   "item": [
     {
@@ -129,6 +130,56 @@
           ]
         },
         "description": "單一交易員風險詳情（US-02）。以 (provider, address) 定位；查無回 404 {\"error\":\"trader not found\"}。\n先呼叫 List Traders / Risk Ranking 取得實際 (provider, address)。"
+      },
+      "response": []
+    },
+    {
+      "name": "Safe Cohort Consensus (all coins)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/consensus", "host": ["{{baseUrl}}"], "path": ["consensus"] },
+        "description": "安全群當前未平倉的方向共識，依 consensusStrength 由高到低排序。\n回應為信封 `{ disclaimer, coins[] }`；每個 coin 含 netDirectionBias（−1…+1，long=+1/short=−1）、consensusStrength、participantCount、longCount/shortCount、longShareOfParticipants、averageLeverage。\n不帶 query 用伺服器預設（maxRiskScore=40、minParticipants=3、新鮮度窗=2×POLL_INTERVAL_MS）。**描述性，非買賣建議。**"
+      },
+      "response": []
+    },
+    {
+      "name": "Safe Cohort Consensus (filtered)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/consensus?provider=hyperliquid&maxRiskScore=40&minParticipants=3&offset=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["consensus"],
+          "query": [
+            { "key": "provider", "value": "hyperliquid", "description": "來源篩選：hyperliquid / okx。缺漏則涵蓋全部 position-tier 來源。" },
+            { "key": "maxRiskScore", "value": "40", "description": "安全群上限：只納入 riskScore ≤ 此值者（0–100，預設 40）。超界回 400。" },
+            { "key": "minParticipants", "value": "3", "description": "某 coin 至少需幾位安全交易員才輸出（整數 ≥ 1，預設 3）。< 1 回 400。" },
+            { "key": "offset", "value": "0", "description": "分頁起始位移（整數 ≥ 0）。" },
+            { "key": "limit", "value": "20", "description": "回傳 coin 筆數上限（整數 ≥ 1，預設 50）。" }
+          ]
+        },
+        "description": "可調整安全群門檻與分頁的共識查詢。query 皆為選用；參數非法（maxRiskScore 不在 0–100、minParticipants < 1 等）回 400。"
+      },
+      "response": []
+    },
+    {
+      "name": "Safe Cohort Consensus (single coin)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/consensus/{{coin}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["consensus", "{{coin}}"],
+          "query": [
+            { "key": "provider", "value": "hyperliquid", "description": "選用：來源篩選。", "disabled": true },
+            { "key": "maxRiskScore", "value": "40", "description": "選用：安全群上限（0–100）。", "disabled": true },
+            { "key": "minParticipants", "value": "3", "description": "選用：最小參與人數（≥ 1）。", "disabled": true }
+          ]
+        },
+        "description": "單一 coin 的安全群持倉共識細節。回應同信封格式但 `coins` 僅含該 coin。\n該 coin 安全群參與人數 < minParticipants（預設 3）時回 404 {\"error\":\"no qualifying consensus for coin\"}。\n先呼叫上面的「Safe Cohort Consensus (all coins)」挑一個有共識的 coin，填入 `coin` 變數（預設 BTC）。"
       },
       "response": []
     }
