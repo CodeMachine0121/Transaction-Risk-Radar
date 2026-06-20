@@ -144,6 +144,22 @@ describe('Position behaviour', () => {
     expect(position.isAveragingDown()).toBe(false);
   });
 
+  it('flags averaging down when a short adds above its average entry', () => {
+    const position = buildPosition({
+      side: 'short',
+      events: [event('open', 100, 1), event('add', 110, 1)],
+    });
+    expect(position.isAveragingDown()).toBe(true);
+  });
+
+  it('does not flag a short scaling into a winner (adds below average entry)', () => {
+    const position = buildPosition({
+      side: 'short',
+      events: [event('open', 100, 1), event('add', 90, 1)],
+    });
+    expect(position.isAveragingDown()).toBe(false);
+  });
+
   it('throws on maxAdverseExcursion without snapshots', () => {
     expect(() => buildPosition({ snapshots: [] }).maxAdverseExcursion()).toThrow(RangeError);
   });

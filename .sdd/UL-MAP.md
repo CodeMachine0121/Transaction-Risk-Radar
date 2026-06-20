@@ -22,7 +22,7 @@ _Records entities, value objects, attributes and their correspondence between co
 | 浮虧快照 Snapshot              | `position_snapshots`                  | —                           | 每次輪詢對每個開倉拍下的時間切片，記錄 mark_price、unrealized_profit_and_loss_percentage、margin、timestamp。是計算 MAE 的依據。                | Confirmed                      |
 | 最大逆向幅度 MAE               | `maxAdverseExcursionPerPosition`      | Max Adverse Excursion       | 單一倉位生命週期內最深的浮虧百分比，即 `min(unrealizedProfitAndLossPercentage)`。代表跟單所需的最大回撤緩衝。                                   | Confirmed                      |
 | 最大逆向幅度第90百分位         | `maxAdverseExcursionPercentile90`     | MAE (p90)                   | 交易員所有倉位 `                                                                                                                                | maxAdverseExcursionPerPosition | ` 的第 90 百分位。代表「90% 的倉位最深都在此幅度內」。 | Confirmed |
-| 攤平 / 馬丁格爾 Averaging-down | `isAveragingDown`                     | Martingale / Averaging-down | 交易員在倉位虧損中（`unrealizedProfitAndLossPercentage < 0`）以遞增 size 加倉的行為。標記為高危。                                               | Confirmed                      |
+| 攤平 / 馬丁格爾 Averaging-down | `isAveragingDown`                     | Martingale / Averaging-down | 交易員以「劣於加權平均進場價」的價格加倉（多單低於均價、空單高於均價），拉低/拉高均價的行為。標記為高危。                                       | Confirmed                      |
 | 攤平比例 Averaging-down Ratio  | `averagingDownRatio`                  | Averaging-down Ratio        | 有攤平行為的倉位數 / 總倉位數。越高越偏馬丁格爾、越危險。                                                                                       | Confirmed                      |
 | 已實現盈虧 Realized PnL        | `realizedProfitAndLoss`               | Realized PnL                | 倉位平倉後實際結算的盈虧。                                                                                                                      | Confirmed                      |
 | 單筆報酬率 Per-position Return | `realizedReturnPercentagePerPosition` | Return per Trade            | 單一已平倉位的已實現報酬率，是計算勝率與下行標準差的基礎序列。                                                                                  | Confirmed                      |
@@ -45,18 +45,18 @@ _Records entities, value objects, attributes and their correspondence between co
 
 _Records business operations, function logic, and their corresponding business actions._
 
-| Business Action                 | Technical Method                            | Trigger                      | Business Impact                                                       | Notes                            |
-| :------------------------------ | :------------------------------------------ | :--------------------------- | :-------------------------------------------------------------------- | :------------------------------- |
-| 同步交易員清單 Sync Traders     | `synchronizeLeaderboard`                    | 背景作業定時觸發             | 從 Hyperliquid leaderboard 拉取並去重，更新 `traders` 清單            | 須處理分頁與限流                 |
-| 輪詢交易員資料 Poll Trader      | `pollTrader`                                | 分層排程（高排名勤、長尾鬆） | 撈取持倉/成交，寫入 `position_events` 與 `position_snapshots`         | 以成交唯一 id 去重 (idempotency) |
-| 計算最大逆向幅度                | `computeMaxAdverseExcursion`                | 分析引擎排程                 | 由 snapshots 算出每倉位與 p90 的 MAE，寫回 `trader_metrics`           |                                  |
-| 偵測攤平 Detect Averaging-down  | `detectAveragingDown`                       | 分析引擎排程                 | 掃描 `position_events`，標記虧損中遞增加倉，計算 `averagingDownRatio` | 核心差異化邏輯                   |
-| 計算盈虧與勝率                  | `computeProfitAndLossStatistics`            | 分析引擎排程                 | 由近 90 天已平倉位算出 `realizedProfitAndLoss`、`winRate`             | 時間窗 = 近 90 天                |
-| 計算下行標準差                  | `computeReturnDownsideDeviation`            | 分析引擎排程                 | 由近 90 天每筆報酬率的負報酬部分算出 `returnDownsideDeviation`        | 衡量盈虧穩定度                   |
-| 計算陷阱訊號                    | `computeTrapSignal`                         | 分析引擎排程                 | `winRate × normalize(maxAdverseExcursionPercentile90)`                |                                  |
-| 計算風險分數                    | `computeRiskScore`                          | 分析引擎排程                 | 加權組合各指標為 `riskScore`，供排行排序                              | 權重見 PRD 第 4 章               |
-| 查詢風險排行 Query Risk Ranking | `getRiskRanking` (`GET /rankings`)          | 使用者呼叫 REST API          | 回傳依 riskScore 排序的交易員列表                                     | 支援排序/分頁                    |
-| 查詢交易員詳情 Query Trader     | `getTraderDetail` (`GET /traders/:address`) | 使用者呼叫 REST API          | 回傳單一交易員的完整指標、攤平標記、MAE                               |                                  |
+| Business Action                 | Technical Method                            | Trigger                      | Business Impact                                                                | Notes                            |
+| :------------------------------ | :------------------------------------------ | :--------------------------- | :----------------------------------------------------------------------------- | :------------------------------- |
+| 同步交易員清單 Sync Traders     | `synchronizeLeaderboard`                    | 背景作業定時觸發             | 從 Hyperliquid leaderboard 拉取並去重，更新 `traders` 清單                     | 須處理分頁與限流                 |
+| 輪詢交易員資料 Poll Trader      | `pollTrader`                                | 分層排程（高排名勤、長尾鬆） | 撈取持倉/成交，寫入 `position_events` 與 `position_snapshots`                  | 以成交唯一 id 去重 (idempotency) |
+| 計算最大逆向幅度                | `computeMaxAdverseExcursion`                | 分析引擎排程                 | 由 snapshots 算出每倉位與 p90 的 MAE，寫回 `trader_metrics`                    |                                  |
+| 偵測攤平 Detect Averaging-down  | `detectAveragingDown`                       | 分析引擎排程                 | 掃描倉位 events，標記以劣於加權平均進場價加倉的倉位，計算 `averagingDownRatio` | 核心差異化邏輯                   |
+| 計算盈虧與勝率                  | `computeProfitAndLossStatistics`            | 分析引擎排程                 | 由近 90 天已平倉位算出 `realizedProfitAndLoss`、`winRate`                      | 時間窗 = 近 90 天                |
+| 計算下行標準差                  | `computeReturnDownsideDeviation`            | 分析引擎排程                 | 由近 90 天每筆報酬率的負報酬部分算出 `returnDownsideDeviation`                 | 衡量盈虧穩定度                   |
+| 計算陷阱訊號                    | `computeTrapSignal`                         | 分析引擎排程                 | `winRate × normalize(maxAdverseExcursionPercentile90)`                         |                                  |
+| 計算風險分數                    | `computeRiskScore`                          | 分析引擎排程                 | 加權組合各指標為 `riskScore`，供排行排序                                       | 權重見 PRD 第 4 章               |
+| 查詢風險排行 Query Risk Ranking | `getRiskRanking` (`GET /rankings`)          | 使用者呼叫 REST API          | 回傳依 riskScore 排序的交易員列表                                              | 支援排序/分頁                    |
+| 查詢交易員詳情 Query Trader     | `getTraderDetail` (`GET /traders/:address`) | 使用者呼叫 REST API          | 回傳單一交易員的完整指標、攤平標記、MAE                                        |                                  |
 
 ---
 
@@ -80,7 +80,7 @@ _Records magic numbers/strings in code and their real business meaning._
 | Category            | Code Value / Key | Domain Label | Description                                      |
 | :------------------ | :--------------- | :----------- | :----------------------------------------------- |
 | Position Event Type | `open`           | 開倉         | 倉位首次建立                                     |
-| Position Event Type | `add`            | 加倉         | 增加倉位 size（虧損中的 add 是攤平偵測重點）     |
+| Position Event Type | `add`            | 加倉         | 增加倉位 size（劣於均價的 add 是攤平偵測重點）   |
 | Position Event Type | `reduce`         | 減倉         | 部分平倉                                         |
 | Position Event Type | `close`          | 平倉         | 倉位完全結束                                     |
 | Position Status     | `open`           | 持倉中       | 倉位尚未平倉                                     |

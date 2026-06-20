@@ -81,10 +81,13 @@ synchronizeLeaderboard ──▶ traders
 2. **攤平偵測**
 
    ```
-   isAveragingDown(position) = position 在 unrealizedProfitAndLossPercentage < 0 時
-                               存在 size 遞增的 add 事件
+   isAveragingDown(position) = position 存在「以劣於當前加權平均進場價的價格加倉」的 add 事件
+                               （多單：add price < 加權平均進場價；空單：add price > 加權平均進場價）
    averagingDownRatio        = count(isAveragingDown) / count(positions)
    ```
+
+   > **口徑說明**：攤平＝在不利價位加倉以拉低（多）／拉高（空）持倉均價，屬 averaging-down 的經典定義。
+   > 改以「加倉價 vs 加權平均進場價」判定（僅需 fills，較不依賴 snapshot 取樣時機），不採用「snapshot uPnL < 0 + size 遞增」口徑。
 
 3. **盈虧與勝率（近 90 天）**
 
