@@ -1,16 +1,21 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { BacktestApplication } from './application/backtestApplication';
 import { ListTradersApplication } from './application/listTradersApplication';
 import { RiskRankingApplication } from './application/riskRankingApplication';
 import { EntrySignalApplication } from './application/entrySignalApplication';
 import { SafeCohortConsensusApplication } from './application/safeCohortConsensusApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
+import { BacktestController } from './controller/backtestController';
 import { EntrySignalController } from './controller/entrySignalController';
 import { RiskRankingController } from './controller/riskRankingController';
 import { SafeCohortConsensusController } from './controller/safeCohortConsensusController';
 import { TraderDetailController } from './controller/traderDetailController';
 import { TraderListController } from './controller/traderListController';
+import type { IConsensusSnapshotRepository } from './domain/interface/iConsensusSnapshotRepository';
 import type { IPositionRepository } from './domain/interface/iPositionRepository';
+import type { IPriceProxy } from './domain/interface/iPriceProxy';
 import type { ITraderRepository } from './domain/interface/iTraderRepository';
+import { BacktestEvaluatorService } from './domain/service/backtestEvaluatorService';
 import { EntrySignalService } from './domain/service/entrySignalService';
 import { RiskRankingService } from './domain/service/riskRankingService';
 import { SafeCohortConsensusService } from './domain/service/safeCohortConsensusService';
@@ -20,10 +25,22 @@ import { TraderListService } from './domain/service/traderListService';
 /** 安全群共識新鮮度窗預設：2 × 預設 POLL_INTERVAL_MS（30s）。 */
 const DEFAULT_CONSENSUS_FRESHNESS_WINDOW_MILLISECONDS = 2 * 30_000;
 
+/** /backtest 的依賴與設定；省略則不註冊該（內部/受保護）端點。 */
+export type BacktestServerOptions = {
+  consensusSnapshotRepository: IConsensusSnapshotRepository;
+  priceProxy: IPriceProxy;
+  /** 設定後，請求須帶相符的 `x-internal-token` 標頭。 */
+  token?: string;
+  /** env BACKTEST_HORIZONS_HOURS 解析後的預設視窗（小時）。 */
+  defaultHorizonsHours?: number[];
+};
+
 export type BuildServerOptions = {
   logger?: boolean;
   /** 安全群共識新鮮度窗（ms）；組裝根可由 POLL_INTERVAL_MS 推得。 */
   consensusFreshnessWindowMilliseconds?: number;
+  /** 提供則註冊內部/受保護的 /backtest 端點。 */
+  backtest?: BacktestServerOptions;
 };
 
 /**
@@ -68,6 +85,21 @@ export function buildServer(
   traderDetailController.register(server);
   safeCohortConsensusController.register(server);
   entrySignalController.register(server);
+
+  if (options.backtest !== undefined) {
+    const backtestController = new BacktestController(
+      new BacktestApplication(
+        options.backtest.consensusSnapshotRepository,
+        options.backtest.priceProxy,
+        new BacktestEvaluatorService(),
+      ),
+      {
+        token: options.backtest.token,
+        defaultHorizonsHours: options.backtest.defaultHorizonsHours ?? [],
+      },
+    );
+    backtestController.register(server);
+  }
 
   return server;
 }

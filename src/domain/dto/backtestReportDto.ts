@@ -25,6 +25,10 @@ export type HorizonResultDto = {
 /** 某 coin 的回測報告：各 horizon 的預測力指標。供人工校準門檻，非自動套用。 */
 export type BacktestReportDto = {
   coin: string;
+  /** 重免責；明標非下單指令。 */
+  disclaimer: string;
+  /** 恆 true：規則預測力尚待校準。 */
+  experimental: true;
   /** 非 neutral 的共識訊號點數（無論是否有對照價格）。 */
   evaluatedSignalCount: number;
   horizons: HorizonResultDto[];

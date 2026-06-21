@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import Decimal from 'decimal.js';
 import { buildServer } from '@/server';
+import type { BacktestReportDto } from '@/domain/dto/backtestReportDto';
 import type { EntrySignalReportDto } from '@/domain/dto/entrySignalReportDto';
 import type { SafeCohortConsensusDto } from '@/domain/dto/safeCohortConsensusDto';
 import type { TraderRiskDto } from '@/domain/dto/traderRiskDto';
 import type { CurrentOpenPosition } from '@/domain/vo/currentOpenPosition';
 import { Provider } from '@/domain/vo/provider';
+import { createMockConsensusSnapshotRepository } from './application/support/mockConsensusSnapshotRepository';
+import { createMockPriceProxy } from './application/support/mockPriceProxy';
 import { createMockPositionRepository } from './application/support/mockPositionRepository';
 import {
   buildTrader,
@@ -236,6 +239,60 @@ describe('HTTP API', () => {
     server = buildServer(createMockTraderRepository(), createMockPositionRepository());
 
     const response = await server.inject({ method: 'GET', url: '/signals?weighting=bogus' });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  const buildServerWithBacktest = (token?: string): FastifyInstance =>
+    buildServer(createMockTraderRepository(), createMockPositionRepository(), {
+      backtest: {
+        consensusSnapshotRepository: createMockConsensusSnapshotRepository(),
+        priceProxy: createMockPriceProxy(),
+        token,
+      },
+    });
+
+  it('GET /backtest returns an experimental report with per-horizon dataAdequacy', async () => {
+    server = buildServerWithBacktest('secret');
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/backtest?coin=BTC&horizonsHours=4',
+      headers: { 'x-internal-token': 'secret' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<BacktestReportDto>();
+    expect(body.coin).toBe('BTC');
+    expect(body.experimental).toBe(true);
+    expect(body.disclaimer.length).toBeGreaterThan(0);
+    expect(body.horizons).toHaveLength(1);
+    expect(body.horizons[0]?.dataAdequacy.level).toBe('insufficient'); // empty series
+    expect(body.horizons[0]?.dataAdequacy.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('GET /backtest rejects a missing or wrong internal token with 401', async () => {
+    server = buildServerWithBacktest('secret');
+
+    const missing = await server.inject({ method: 'GET', url: '/backtest?coin=BTC' });
+    const wrong = await server.inject({
+      method: 'GET',
+      url: '/backtest?coin=BTC',
+      headers: { 'x-internal-token': 'nope' },
+    });
+
+    expect(missing.statusCode).toBe(401);
+    expect(wrong.statusCode).toBe(401);
+  });
+
+  it('GET /backtest rejects a missing coin with 400', async () => {
+    server = buildServerWithBacktest('secret');
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/backtest?horizonsHours=4',
+      headers: { 'x-internal-token': 'secret' },
+    });
 
     expect(response.statusCode).toBe(400);
   });

@@ -12,6 +12,8 @@ import type { ConsensusSnapshotPoint } from '../vo/consensusSnapshotPoint';
 import type { PricePoint } from '../vo/pricePoint';
 
 const ZERO = new Decimal(0);
+const DISCLAIMER =
+  '【experimental／未經回測校準】本回測為規則預測力的離線評估，非下單指令、非倉位建議、非獲利保證。樣本高度自相關，請以 dataAdequacy 與 independentSampleEstimate 判讀可信度；多數 coin × horizon 資料不足屬正常。';
 
 type Lean = 'long' | 'short' | 'neutral';
 
@@ -45,6 +47,8 @@ export class BacktestEvaluatorService {
       .sort((left, right) => left.capturedAt - right.capturedAt);
     return {
       coin,
+      disclaimer: DISCLAIMER,
+      experimental: true,
       evaluatedSignalCount: directional.length,
       horizons: horizonsMilliseconds.map((horizon) =>
         this.evaluateHorizon(directional, sortedPrices, horizon),
