@@ -65,6 +65,7 @@ export class BacktestEvaluatorService {
     let nextIndependentEligibleAt = -Infinity;
     let firstSampledAt = 0;
     let lastSampledAt = 0;
+    const sampledParticipantCounts: number[] = [];
     for (const point of directional) {
       const entry = this.priceAtOrAfter(sortedPrices, point.capturedAt);
       const exit = this.priceAtOrAfter(sortedPrices, point.capturedAt + horizonMilliseconds);
@@ -77,6 +78,7 @@ export class BacktestEvaluatorService {
         firstSampledAt = point.capturedAt;
       }
       lastSampledAt = point.capturedAt;
+      sampledParticipantCounts.push(point.participantCount);
       sampleCount += 1;
       alignedReturnSum = alignedReturnSum.plus(aligned);
       if (aligned.greaterThan(ZERO)) {
@@ -89,29 +91,65 @@ export class BacktestEvaluatorService {
     }
     const count = new Decimal(sampleCount);
     const spanMilliseconds = sampleCount === 0 ? 0 : lastSampledAt - firstSampledAt;
+    const typicalParticipantCount = this.median(sampledParticipantCounts);
     return {
       horizonMilliseconds,
       sampleCount,
       independentSampleEstimate,
       signalHitRate: sampleCount === 0 ? '0' : new Decimal(hitCount).dividedBy(count).toString(),
       averageForwardReturn: sampleCount === 0 ? '0' : alignedReturnSum.dividedBy(count).toString(),
-      dataAdequacy: { level: this.adequacyLevel(independentSampleEstimate, spanMilliseconds), reasons: [] },
+      dataAdequacy: this.computeDataAdequacy(
+        independentSampleEstimate,
+        spanMilliseconds,
+        typicalParticipantCount,
+      ),
     };
   }
 
-  /** 由獨立樣本數 + 日曆跨度判定充足度分級（木桶短板；參與深度封頂於 Cycle 3）。 */
-  private adequacyLevel(
+  /**
+   * 三軸（獨立樣本／日曆跨度／參與深度）合成充足度分級，採**木桶短板**：
+   * 樣本數 + 跨度定基礎級別，典型參與人數低於下限再封頂至 smoke-test。reasons 必填。
+   */
+  private computeDataAdequacy(
     independentSampleEstimate: number,
     spanMilliseconds: number,
-  ): BacktestAdequacyLevel {
+    typicalParticipantCount: number,
+  ): { level: BacktestAdequacyLevel; reasons: string[] } {
     const thresholds = this.adequacyThresholds;
-    if (independentSampleEstimate < thresholds.smokeTestMinimum) {
-      return 'insufficient';
+    const bySamples: BacktestAdequacyLevel =
+      independentSampleEstimate < thresholds.smokeTestMinimum
+        ? 'insufficient'
+        : independentSampleEstimate < thresholds.trustworthyMinimum
+          ? 'smoke-test'
+          : spanMilliseconds >= thresholds.adequateSpanMilliseconds
+            ? 'adequate'
+            : 'preliminary';
+    const thinParticipation = typicalParticipantCount < thresholds.participationFloor;
+    const level = thinParticipation ? this.capAtSmokeTest(bySamples) : bySamples;
+    const reasons = [
+      `獨立樣本 ${independentSampleEstimate}（smoke ${thresholds.smokeTestMinimum} / trust ${thresholds.trustworthyMinimum}）`,
+      `日曆跨度 ${spanMilliseconds}ms（adequate 門檻 ${thresholds.adequateSpanMilliseconds}ms）`,
+      `典型參與人數 ${typicalParticipantCount}（下限 ${thresholds.participationFloor}${thinParticipation ? '，已封頂 smoke-test' : ''}）`,
+    ];
+    return { level, reasons };
+  }
+
+  /** 木桶封頂：級別不得高於 smoke-test（insufficient 維持不動）。 */
+  private capAtSmokeTest(level: BacktestAdequacyLevel): BacktestAdequacyLevel {
+    return level === 'preliminary' || level === 'adequate' ? 'smoke-test' : level;
+  }
+
+  /** 整數序列中位數；空序列回 0。 */
+  private median(values: number[]): number {
+    if (values.length === 0) {
+      return 0;
     }
-    if (independentSampleEstimate < thresholds.trustworthyMinimum) {
-      return 'smoke-test';
+    const sorted = [...values].sort((left, right) => left - right);
+    const middle = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 1) {
+      return sorted[middle] ?? 0;
     }
-    return spanMilliseconds >= thresholds.adequateSpanMilliseconds ? 'adequate' : 'preliminary';
+    return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
   }
 
   private leanOf(point: ConsensusSnapshotPoint): Lean {

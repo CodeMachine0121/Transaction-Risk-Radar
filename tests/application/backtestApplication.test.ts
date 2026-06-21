@@ -150,4 +150,52 @@ describe('BacktestApplication', () => {
     expect(await levelFor([0, 10, 20, 30])).toBe('preliminary'); // 4 independent, span 30 < 1000
     expect(await levelFor([0, 10, 20, 1000])).toBe('adequate'); // 4 independent, span 1000
   });
+
+  it('caps the level at smoke-test when typical participation is below the floor', async () => {
+    const consensusSnapshots = createMockConsensusSnapshotRepository();
+    // 4 independent + span 1000 would be 'adequate', but every point has only 2
+    // participants (< floor 5) — a thin "consensus" is not a consensus.
+    vi.mocked(consensusSnapshots.loadConsensusSeries).mockResolvedValue([
+      consensusPoint(0, 1, 2),
+      consensusPoint(10, 1, 2),
+      consensusPoint(20, 1, 2),
+      consensusPoint(1000, 1, 2),
+    ]);
+    const priceProxy = createMockPriceProxy();
+    vi.mocked(priceProxy.fetchPriceSeries).mockResolvedValue(
+      [0, 10, 20, 30, 1000, 1010].map((timestamp, index) => price(timestamp, 100 + index)),
+    );
+    const application = new BacktestApplication(
+      consensusSnapshots,
+      priceProxy,
+      new BacktestEvaluatorService({
+        adequacyThresholds: {
+          smokeTestMinimum: 2,
+          trustworthyMinimum: 4,
+          adequateSpanMilliseconds: 1000,
+          participationFloor: 5,
+        },
+      }),
+    );
+
+    const report = await application.evaluate('BTC', 0, [10]);
+
+    expect(report.horizons[0]?.dataAdequacy.level).toBe('smoke-test'); // capped down from adequate
+  });
+
+  it('always populates dataAdequacy.reasons', async () => {
+    const consensusSnapshots = createMockConsensusSnapshotRepository();
+    vi.mocked(consensusSnapshots.loadConsensusSeries).mockResolvedValue([consensusPoint(0, 1)]);
+    const priceProxy = createMockPriceProxy();
+    vi.mocked(priceProxy.fetchPriceSeries).mockResolvedValue([price(0, 100), price(60, 110)]);
+    const application = new BacktestApplication(
+      consensusSnapshots,
+      priceProxy,
+      new BacktestEvaluatorService(),
+    );
+
+    const report = await application.evaluate('BTC', 0, [60]);
+
+    expect(report.horizons[0]?.dataAdequacy.reasons.length).toBeGreaterThan(0);
+  });
 });
