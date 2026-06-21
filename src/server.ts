@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { BacktestApplication } from './application/backtestApplication';
+import { ListCoinCoverageApplication } from './application/listCoinCoverageApplication';
 import { ListRecordedCoinsApplication } from './application/listRecordedCoinsApplication';
 import { ListTradersApplication } from './application/listTradersApplication';
 import { RiskRankingApplication } from './application/riskRankingApplication';
@@ -7,6 +8,7 @@ import { EntrySignalApplication } from './application/entrySignalApplication';
 import { SafeCohortConsensusApplication } from './application/safeCohortConsensusApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { BacktestController } from './controller/backtestController';
+import { CoinCoverageController } from './controller/coinCoverageController';
 import { RecordedCoinController } from './controller/recordedCoinController';
 import { EntrySignalController } from './controller/entrySignalController';
 import { RiskRankingController } from './controller/riskRankingController';
@@ -90,12 +92,18 @@ export function buildServer(
   entrySignalController.register(server);
 
   if (options.backtest !== undefined) {
+    const recordedCoinService = new RecordedCoinService(
+      options.backtest.consensusSnapshotRepository,
+    );
     const recordedCoinController = new RecordedCoinController(
-      new ListRecordedCoinsApplication(
-        new RecordedCoinService(options.backtest.consensusSnapshotRepository),
-      ),
+      new ListRecordedCoinsApplication(recordedCoinService),
     );
     recordedCoinController.register(server);
+
+    const coinCoverageController = new CoinCoverageController(
+      new ListCoinCoverageApplication(recordedCoinService),
+    );
+    coinCoverageController.register(server);
 
     const backtestController = new BacktestController(
       new BacktestApplication(

@@ -265,6 +265,24 @@ describe('HTTP API', () => {
     expect(response.json<{ coins: string[] }>().coins).toEqual(['BTC', 'ETH']);
   });
 
+  it('GET /coins/coverage returns per-coin coverage sorted by span descending', async () => {
+    const consensusSnapshotRepository = createMockConsensusSnapshotRepository();
+    vi.mocked(consensusSnapshotRepository.listCoinCoverage).mockResolvedValue([
+      { coin: 'BTC', snapshotCount: 10, earliestCapturedAt: 1000, latestCapturedAt: 2000 }, // span 1000
+      { coin: 'ETH', snapshotCount: 5, earliestCapturedAt: 0, latestCapturedAt: 5000 }, // span 5000
+    ]);
+    server = buildServer(createMockTraderRepository(), createMockPositionRepository(), {
+      backtest: { consensusSnapshotRepository, priceProxy: createMockPriceProxy() },
+    });
+
+    const response = await server.inject({ method: 'GET', url: '/coins/coverage' });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ coins: { coin: string; spanMilliseconds: number }[] }>();
+    expect(body.coins.map((entry) => entry.coin)).toEqual(['ETH', 'BTC']);
+    expect(body.coins[0]?.spanMilliseconds).toBe(5000);
+  });
+
   it('GET /backtest returns an experimental report with per-horizon dataAdequacy', async () => {
     server = buildServerWithBacktest('secret');
 
