@@ -107,6 +107,7 @@ _Records business operations, function logic, and their corresponding business a
 | 留存共識時序 Snapshot Consensus | `snapshotConsensus` | 背景排程（≈recompute 5min） | 將 listConsensus 結果寫入 consensus_snapshots | 回測輸入 |
 | 回測評估 Backtest Evaluate | `backtestEvaluate` | 離線 job（非 HTTP） | 由歷史共識序列 + 前向價格算 forwardReturn/signalHitRate | 純 domain、可注入價格、產校準依據 |
 | 觸發回測 Run Backtest | `runBacktest`（`GET /backtest`，內部/受保護） | 內部呼叫 REST（**同步**） | 讀已累積共識歷史 + 抓對照價格 + 評估 + 回傳含 `dataAdequacy` 的報告 | experimental、非下單；不開 scheduler。**取代既有「回測無 HTTP 介面、離線 job」決定（B2 PRD `2026-06-20-entry-signal-backtest` 待後續對齊，本次不改）** |
+| 列出已記錄標的 List Recorded Coins | `listRecordedCoins`（`GET /coins`） | 使用者呼叫 REST API | 回傳 `consensus_snapshots` 中出現過的不重複 coin（升冪），作為 `/backtest` 的可查詢標的字典 | 公開、不需 token；跨 provider 合併（快照無 provider 維度） |
 
 ---
 
