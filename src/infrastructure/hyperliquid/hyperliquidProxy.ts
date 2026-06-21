@@ -6,6 +6,7 @@ import { Provider } from '../../domain/vo/provider';
 import type { TraderActivity } from '../../domain/vo/traderActivity';
 import type { RequestWeightLimiter } from '../../shared/rateLimit/requestWeightLimiter';
 import { type BackoffOptions, defaultBackoff } from './backoff';
+import { sendWithRetryOn429 } from './sendWithRetryOn429';
 import type { RawClearinghouseState, RawFill, RawLeaderboardResponse } from './hyperliquidWire';
 
 export type { BackoffOptions };
@@ -15,10 +16,6 @@ export const defaultRequestWeights = {
   clearinghouseState: 2,
   userFillsByTime: 20,
 } as const;
-
-/** jitter 佔 exponential delay 的比例（± 由 random 決定，0 → 無 jitter）。 */
-const jitterRatio = 0.2;
-const tooManyRequestsStatus = 429;
 
 const defaultSleep = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -127,37 +124,22 @@ export class HyperliquidProxy implements ITraderDataProxy {
   }
 
   /**
-   * 限流（依 weight，未提供則不計）後送出請求；遇 429 依 Retry-After / exponential
-   * backoff + jitter 重試，至上限為止。非 429 的回應（含其他非 ok）直接回傳交由呼叫端處理。
+   * 限流（依 weight，未提供則不計）後送出請求；遇 429 委由 sendWithRetryOn429 依
+   * Retry-After / exponential backoff + jitter 重試。weight token 於每次嘗試前在 thunk 內取得。
    */
-  private async fetchWithRetry(
+  private fetchWithRetry(
     url: string,
     requestInit?: RequestInit,
     weight?: number,
   ): Promise<Response> {
-    let attempt = 0;
-    for (;;) {
-      if (weight !== undefined && this.requestWeightLimiter !== undefined) {
-        await this.requestWeightLimiter.acquire(weight);
-      }
-      const response = await this.fetchFunction(url, requestInit);
-      if (response.status !== tooManyRequestsStatus || attempt >= this.backoff.maximumRetryCount) {
-        return response;
-      }
-      await this.sleep(this.retryDelayMilliseconds(response, attempt));
-      attempt += 1;
-    }
-  }
-
-  private retryDelayMilliseconds(response: Response, attempt: number): number {
-    const retryAfter = Number(response.headers.get('retry-after'));
-    if (Number.isFinite(retryAfter) && retryAfter > 0) {
-      return retryAfter * 1000;
-    }
-    const exponential = Math.min(
-      this.backoff.baseDelayMilliseconds * 2 ** attempt,
-      this.backoff.maximumDelayMilliseconds,
+    return sendWithRetryOn429(
+      async () => {
+        if (weight !== undefined && this.requestWeightLimiter !== undefined) {
+          await this.requestWeightLimiter.acquire(weight);
+        }
+        return this.fetchFunction(url, requestInit);
+      },
+      { backoff: this.backoff, sleep: this.sleep, random: this.random },
     );
-    return Math.round(exponential * (1 + jitterRatio * this.random()));
   }
 }
