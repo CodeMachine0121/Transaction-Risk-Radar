@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
 import type { IConsensusSnapshotRepository } from '../../domain/interface/iConsensusSnapshotRepository';
+import type { CoinCoverageRecord } from '../../domain/vo/coinCoverageRecord';
 import type { ConsensusSnapshotPoint } from '../../domain/vo/consensusSnapshotPoint';
 import type { ConsensusSnapshotRecord } from '../../domain/vo/consensusSnapshotRecord';
 
@@ -50,5 +51,20 @@ export class ConsensusSnapshotRepository implements IConsensusSnapshotRepository
       select: { coin: true },
     });
     return rows.map((row) => row.coin);
+  }
+
+  async listCoinCoverage(): Promise<CoinCoverageRecord[]> {
+    const groups = await this.prismaClient.consensusSnapshot.groupBy({
+      by: ['coin'],
+      _count: { _all: true },
+      _min: { capturedAt: true },
+      _max: { capturedAt: true },
+    });
+    return groups.map((group) => ({
+      coin: group.coin,
+      snapshotCount: group._count._all,
+      earliestCapturedAt: group._min.capturedAt?.getTime() ?? 0,
+      latestCapturedAt: group._max.capturedAt?.getTime() ?? 0,
+    }));
   }
 }
