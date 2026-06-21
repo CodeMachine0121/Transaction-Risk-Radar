@@ -5,28 +5,16 @@ import type { OpenPosition } from '../../domain/vo/openPosition';
 import { Provider } from '../../domain/vo/provider';
 import type { TraderActivity } from '../../domain/vo/traderActivity';
 import type { RequestWeightLimiter } from '../../shared/rateLimit/requestWeightLimiter';
+import { type BackoffOptions, defaultBackoff } from './backoff';
 import type { RawClearinghouseState, RawFill, RawLeaderboardResponse } from './hyperliquidWire';
+
+export type { BackoffOptions };
 
 /** 各 /info 請求類型的預設 weight（per-IP 預算消耗；動工前對官方 docs 校準）。 */
 export const defaultRequestWeights = {
   clearinghouseState: 2,
   userFillsByTime: 20,
 } as const;
-
-export type BackoffOptions = {
-  /** 429 後的最大重試次數。 */
-  maximumRetryCount: number;
-  /** exponential backoff 基數毫秒。 */
-  baseDelayMilliseconds: number;
-  /** backoff 上限毫秒。 */
-  maximumDelayMilliseconds: number;
-};
-
-const defaultBackoff: BackoffOptions = {
-  maximumRetryCount: 5,
-  baseDelayMilliseconds: 500,
-  maximumDelayMilliseconds: 30000,
-};
 
 /** jitter 佔 exponential delay 的比例（± 由 random 決定，0 → 無 jitter）。 */
 const jitterRatio = 0.2;

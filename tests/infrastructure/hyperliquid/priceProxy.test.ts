@@ -29,4 +29,42 @@ describe('PriceProxy', () => {
     expect(series[0]?.price.toString()).toBe('110');
     expect(series[1]?.price.toString()).toBe('105');
   });
+
+  it('throws on a non-ok response instead of parsing garbage', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('upstream error', { status: 500 }));
+    const proxy = new PriceProxy({
+      infoApiBaseUrl: 'https://api.hyperliquid.xyz',
+      fetchFunction: fetchMock,
+      now: () => 9999,
+    });
+
+    await expect(proxy.fetchPriceSeries('BTC', 500)).rejects.toThrow(/500/);
+  });
+
+  it('retries on 429 then succeeds', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          { t: 1000, T: 2000, s: 'BTC', i: '1h', o: '1', c: '111', h: '1', l: '1', v: '1', n: 1 },
+        ]),
+      );
+    const sleepMock = vi.fn<(milliseconds: number) => Promise<void>>().mockResolvedValue(undefined);
+    const proxy = new PriceProxy({
+      infoApiBaseUrl: 'https://api.hyperliquid.xyz',
+      fetchFunction: fetchMock,
+      now: () => 9999,
+      sleep: sleepMock,
+      random: () => 0,
+    });
+
+    const series = await proxy.fetchPriceSeries('BTC', 500);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sleepMock).toHaveBeenCalledTimes(1);
+    expect(series[0]?.price.toString()).toBe('111');
+  });
 });
