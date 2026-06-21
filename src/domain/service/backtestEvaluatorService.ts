@@ -1,5 +1,13 @@
 import Decimal from 'decimal.js';
-import type { BacktestReportDto, HorizonResultDto } from '../dto/backtestReportDto';
+import type {
+  BacktestAdequacyLevel,
+  BacktestReportDto,
+  HorizonResultDto,
+} from '../dto/backtestReportDto';
+import {
+  DEFAULT_BACKTEST_ADEQUACY_THRESHOLDS,
+  type BacktestAdequacyThresholds,
+} from '../vo/backtestAdequacyThresholds';
 import type { ConsensusSnapshotPoint } from '../vo/consensusSnapshotPoint';
 import type { PricePoint } from '../vo/pricePoint';
 
@@ -13,9 +21,16 @@ type Lean = 'long' | 'short' | 'neutral';
  */
 export class BacktestEvaluatorService {
   private readonly directionEpsilon: Decimal;
+  private readonly adequacyThresholds: BacktestAdequacyThresholds;
 
-  constructor(options: { directionEpsilon?: Decimal } = {}) {
+  constructor(
+    options: {
+      directionEpsilon?: Decimal;
+      adequacyThresholds?: BacktestAdequacyThresholds;
+    } = {},
+  ) {
     this.directionEpsilon = options.directionEpsilon ?? ZERO;
+    this.adequacyThresholds = options.adequacyThresholds ?? DEFAULT_BACKTEST_ADEQUACY_THRESHOLDS;
   }
 
   evaluate(
@@ -48,6 +63,8 @@ export class BacktestEvaluatorService {
     // 獨立樣本：依時間掃描，每納入一個有效樣本後跳過其 horizon 窗內的後續點，避免重疊高估。
     let independentSampleEstimate = 0;
     let nextIndependentEligibleAt = -Infinity;
+    let firstSampledAt = 0;
+    let lastSampledAt = 0;
     for (const point of directional) {
       const entry = this.priceAtOrAfter(sortedPrices, point.capturedAt);
       const exit = this.priceAtOrAfter(sortedPrices, point.capturedAt + horizonMilliseconds);
@@ -56,6 +73,10 @@ export class BacktestEvaluatorService {
       }
       const forwardReturn = exit.minus(entry).dividedBy(entry);
       const aligned = this.leanOf(point) === 'long' ? forwardReturn : forwardReturn.negated();
+      if (sampleCount === 0) {
+        firstSampledAt = point.capturedAt;
+      }
+      lastSampledAt = point.capturedAt;
       sampleCount += 1;
       alignedReturnSum = alignedReturnSum.plus(aligned);
       if (aligned.greaterThan(ZERO)) {
@@ -67,13 +88,30 @@ export class BacktestEvaluatorService {
       }
     }
     const count = new Decimal(sampleCount);
+    const spanMilliseconds = sampleCount === 0 ? 0 : lastSampledAt - firstSampledAt;
     return {
       horizonMilliseconds,
       sampleCount,
       independentSampleEstimate,
       signalHitRate: sampleCount === 0 ? '0' : new Decimal(hitCount).dividedBy(count).toString(),
       averageForwardReturn: sampleCount === 0 ? '0' : alignedReturnSum.dividedBy(count).toString(),
+      dataAdequacy: { level: this.adequacyLevel(independentSampleEstimate, spanMilliseconds), reasons: [] },
     };
+  }
+
+  /** 由獨立樣本數 + 日曆跨度判定充足度分級（木桶短板；參與深度封頂於 Cycle 3）。 */
+  private adequacyLevel(
+    independentSampleEstimate: number,
+    spanMilliseconds: number,
+  ): BacktestAdequacyLevel {
+    const thresholds = this.adequacyThresholds;
+    if (independentSampleEstimate < thresholds.smokeTestMinimum) {
+      return 'insufficient';
+    }
+    if (independentSampleEstimate < thresholds.trustworthyMinimum) {
+      return 'smoke-test';
+    }
+    return spanMilliseconds >= thresholds.adequateSpanMilliseconds ? 'adequate' : 'preliminary';
   }
 
   private leanOf(point: ConsensusSnapshotPoint): Lean {

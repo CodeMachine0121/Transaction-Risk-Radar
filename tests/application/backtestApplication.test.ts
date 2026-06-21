@@ -111,4 +111,43 @@ describe('BacktestApplication', () => {
     expect(horizon?.sampleCount).toBe(5); // overlapping count
     expect(horizon?.independentSampleEstimate).toBe(2); // de-overlapped
   });
+
+  it('maps independent-sample count to a dataAdequacy level', async () => {
+    // tiny injected thresholds keep synthetic data small; participation high so the
+    // participation floor never triggers (that downgrade is covered separately).
+    const thresholds = {
+      smokeTestMinimum: 2,
+      trustworthyMinimum: 4,
+      adequateSpanMilliseconds: 1000,
+      participationFloor: 1,
+    };
+    const levelFor = async (capturedAts: number[]): Promise<string> => {
+      const consensusSnapshots = createMockConsensusSnapshotRepository();
+      vi.mocked(consensusSnapshots.loadConsensusSeries).mockResolvedValue(
+        capturedAts.map((at) => consensusPoint(at, 1)),
+      );
+      const timestamps = new Set<number>();
+      capturedAts.forEach((at) => {
+        timestamps.add(at);
+        timestamps.add(at + 10);
+      });
+      const prices = [...timestamps]
+        .sort((left, right) => left - right)
+        .map((timestamp, index) => price(timestamp, 100 + index));
+      const priceProxy = createMockPriceProxy();
+      vi.mocked(priceProxy.fetchPriceSeries).mockResolvedValue(prices);
+      const application = new BacktestApplication(
+        consensusSnapshots,
+        priceProxy,
+        new BacktestEvaluatorService({ adequacyThresholds: thresholds }),
+      );
+      const report = await application.evaluate('BTC', 0, [10]);
+      return report.horizons[0]?.dataAdequacy.level ?? '';
+    };
+
+    expect(await levelFor([0])).toBe('insufficient'); // 1 independent < 2
+    expect(await levelFor([0, 10])).toBe('smoke-test'); // 2 independent, < 4
+    expect(await levelFor([0, 10, 20, 30])).toBe('preliminary'); // 4 independent, span 30 < 1000
+    expect(await levelFor([0, 10, 20, 1000])).toBe('adequate'); // 4 independent, span 1000
+  });
 });
