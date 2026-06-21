@@ -1,8 +1,10 @@
 /** 單一評估視窗（horizon）的回測結果。 */
 export type HorizonResultDto = {
   horizonMilliseconds: number;
-  /** 有方向且兩端皆有對照價格的樣本數。 */
+  /** 有方向且兩端皆有對照價格的樣本數（**重疊**計數，為高估上界）。 */
   sampleCount: number;
+  /** 非重疊窗的獨立樣本估計（資料充足度判定依據；恆 ≤ sampleCount）。 */
+  independentSampleEstimate: number;
   /** lean 方向與 forwardReturn 同號的比例（0..1）。 */
   signalHitRate: string;
   /** 以 lean 方向對齊的前向報酬平均（>0 代表方向平均有利）。 */

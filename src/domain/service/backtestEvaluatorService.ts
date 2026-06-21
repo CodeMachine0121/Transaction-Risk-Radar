@@ -25,7 +25,9 @@ export class BacktestEvaluatorService {
     horizonsMilliseconds: number[],
   ): BacktestReportDto {
     const sortedPrices = [...priceSeries].sort((left, right) => left.timestamp - right.timestamp);
-    const directional = series.filter((point) => this.leanOf(point) !== 'neutral');
+    const directional = series
+      .filter((point) => this.leanOf(point) !== 'neutral')
+      .sort((left, right) => left.capturedAt - right.capturedAt);
     return {
       coin,
       evaluatedSignalCount: directional.length,
@@ -43,6 +45,9 @@ export class BacktestEvaluatorService {
     let sampleCount = 0;
     let hitCount = 0;
     let alignedReturnSum = ZERO;
+    // 獨立樣本：依時間掃描，每納入一個有效樣本後跳過其 horizon 窗內的後續點，避免重疊高估。
+    let independentSampleEstimate = 0;
+    let nextIndependentEligibleAt = -Infinity;
     for (const point of directional) {
       const entry = this.priceAtOrAfter(sortedPrices, point.capturedAt);
       const exit = this.priceAtOrAfter(sortedPrices, point.capturedAt + horizonMilliseconds);
@@ -56,11 +61,16 @@ export class BacktestEvaluatorService {
       if (aligned.greaterThan(ZERO)) {
         hitCount += 1;
       }
+      if (point.capturedAt >= nextIndependentEligibleAt) {
+        independentSampleEstimate += 1;
+        nextIndependentEligibleAt = point.capturedAt + horizonMilliseconds;
+      }
     }
     const count = new Decimal(sampleCount);
     return {
       horizonMilliseconds,
       sampleCount,
+      independentSampleEstimate,
       signalHitRate: sampleCount === 0 ? '0' : new Decimal(hitCount).dividedBy(count).toString(),
       averageForwardReturn: sampleCount === 0 ? '0' : alignedReturnSum.dividedBy(count).toString(),
     };

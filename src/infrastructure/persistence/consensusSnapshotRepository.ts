@@ -39,6 +39,7 @@ export class ConsensusSnapshotRepository implements IConsensusSnapshotRepository
       coin: row.coin,
       convictionWeightedDirectionBias: new Decimal(row.convictionWeightedDirectionBias.toString()),
       consensusStrength: new Decimal(row.consensusStrength.toString()),
+      participantCount: row.participantCount,
       capturedAt: row.capturedAt.getTime(),
     }));
   }

@@ -5,5 +5,7 @@ export type ConsensusSnapshotPoint = {
   coin: string;
   convictionWeightedDirectionBias: Decimal;
   consensusStrength: Decimal;
+  /** 該共識點的參與人數；回測資料充足度的「參與深度」軸。 */
+  participantCount: number;
   capturedAt: number;
 };
