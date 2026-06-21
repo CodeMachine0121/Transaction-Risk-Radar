@@ -71,7 +71,9 @@ _Records entities, value objects, attributes and their correspondence between co
 | 共識時序快照 Consensus Snapshot | `consensusSnapshot`（`consensus_snapshots`） | — | 每輪 listConsensus 結果的時序留存（coin/兩種 bias/strength/maxConvictionShare/participantCount/capturedAt），回測輸入。 | Confirmed |
 | 前向報酬 Forward Return | `forwardReturn` | — | 共識點 t 後 horizon h 的價格相對報酬 `(price[t+h]−price[t])/price[t]`；回測命中判定基礎。 | Confirmed |
 | 訊號命中率 Signal Hit Rate | `signalHitRate` | — | 回測中 lean 方向與 forwardReturn 同號的比例（neutral 不計）；衡量規則預測力。 | Confirmed |
-| 評估視窗 Horizon | `horizon` | — | 回測前向評估的時間視窗（預設 1h/4h/1d）。 | Confirmed |
+| 評估視窗 Horizon | `horizon` | — | 回測前向評估的時間視窗（預設 1h/4h/1d）。可由 env `BACKTEST_HORIZONS_HOURS`（小時、一串）設定預設，請求可覆蓋。 | Confirmed |
+| 資料充足度 Data Adequacy | `dataAdequacy`（level enum：`insufficient`/`smoke-test`/`preliminary`/`adequate`） | — | 回測報告每 **coin × horizon** 一格的可信度分級 + `reasons[]`；依「獨立樣本估計／日曆跨度／參與深度」三軸判定，**非原始 sampleCount**；不跨 coin 池化。 | Confirmed |
+| 獨立樣本估計 Independent Sample Estimate | `independentSampleEstimate` | — | 以「實際有共識點且兩端皆有對照價的**非重疊窗**」計數，取代重疊高估的 `sampleCount`；為 adequacy 判定與信賴度依據。 | Confirmed |
 
 ---
 
@@ -104,6 +106,7 @@ _Records business operations, function logic, and their corresponding business a
 | 評估進場訊號 Evaluate Entry Signals | `evaluateEntrySignals` (`GET /signals`) | 使用者呼叫 REST API | listConsensus 後由 EntrySignalService 將共識化為分級訊號 | opt-in、experimental、重免責；非下單 |
 | 留存共識時序 Snapshot Consensus | `snapshotConsensus` | 背景排程（≈recompute 5min） | 將 listConsensus 結果寫入 consensus_snapshots | 回測輸入 |
 | 回測評估 Backtest Evaluate | `backtestEvaluate` | 離線 job（非 HTTP） | 由歷史共識序列 + 前向價格算 forwardReturn/signalHitRate | 純 domain、可注入價格、產校準依據 |
+| 觸發回測 Run Backtest | `runBacktest`（`GET /backtest`，內部/受保護） | 內部呼叫 REST（**同步**） | 讀已累積共識歷史 + 抓對照價格 + 評估 + 回傳含 `dataAdequacy` 的報告 | experimental、非下單；不開 scheduler。**取代既有「回測無 HTTP 介面、離線 job」決定（B2 PRD `2026-06-20-entry-signal-backtest` 待後續對齊，本次不改）** |
 
 ---
 
