@@ -217,6 +217,16 @@
       "response": []
     },
     {
+      "name": "Recorded Coins",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/coins", "host": ["{{baseUrl}}"], "path": ["coins"] },
+        "description": "有共識紀錄的標的清單，回 `{ coins: string[] }`（依字母升冪、不重複）。\n這是 /backtest 的「可查詢標的字典」——先用它確認哪些 coin 有共識歷史，再挑一個去 /backtest，避免猜到沒資料的 coin。\n公開端點、不需 token；無紀錄時回 `{ coins: [] }`。"
+      },
+      "response": []
+    },
+    {
       "name": "Backtest (internal, experimental)",
       "request": {
         "method": "GET",

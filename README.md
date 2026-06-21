@@ -95,6 +95,7 @@ bun run dev                            # REST API（watch）
 | `GET` | `/consensus` | 安全群（低風險交易員）持倉共識 |
 | `GET` | `/consensus/:coin` | 指定幣種的共識；無合格共識回 404 |
 | `GET` | `/signals` | 由安全群共識導出的進場訊號（experimental，**非下單指令**） |
+| `GET` | `/coins` | 有共識紀錄的標的清單 `{ coins: [] }`（`/backtest` 的可查詢標的字典） |
 | `GET` | `/backtest` | **內部／受保護**：某 coin 的訊號回測（命中率／前向報酬 + 資料充足度），同步、experimental、**非下單指令** |
 
 **常用查詢參數**

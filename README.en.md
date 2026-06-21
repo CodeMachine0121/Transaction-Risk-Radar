@@ -95,6 +95,7 @@ bun run dev                            # REST API (watch)
 | `GET` | `/consensus` | Position consensus of the safe cohort (low-risk traders) |
 | `GET` | `/consensus/:coin` | Consensus for a given coin; 404 if none qualifies |
 | `GET` | `/signals` | Entry signals derived from safe-cohort consensus (experimental, **not order instructions**) |
+| `GET` | `/coins` | List of coins with recorded consensus history `{ coins: [] }` (the queryable-coin dictionary for `/backtest`) |
 | `GET` | `/backtest` | **Internal / protected**: per-coin signal backtest (hit rate / forward return + data adequacy), synchronous, experimental, **not order instructions** |
 
 **Common query parameters**
