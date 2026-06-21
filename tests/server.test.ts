@@ -252,6 +252,19 @@ describe('HTTP API', () => {
       },
     });
 
+  it('GET /coins returns the recorded coins sorted ascending', async () => {
+    const consensusSnapshotRepository = createMockConsensusSnapshotRepository();
+    vi.mocked(consensusSnapshotRepository.listRecordedCoins).mockResolvedValue(['ETH', 'BTC']);
+    server = buildServer(createMockTraderRepository(), createMockPositionRepository(), {
+      backtest: { consensusSnapshotRepository, priceProxy: createMockPriceProxy() },
+    });
+
+    const response = await server.inject({ method: 'GET', url: '/coins' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ coins: string[] }>().coins).toEqual(['BTC', 'ETH']);
+  });
+
   it('GET /backtest returns an experimental report with per-horizon dataAdequacy', async () => {
     server = buildServerWithBacktest('secret');
 

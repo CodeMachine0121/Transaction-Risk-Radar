@@ -1,11 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { BacktestApplication } from './application/backtestApplication';
+import { ListRecordedCoinsApplication } from './application/listRecordedCoinsApplication';
 import { ListTradersApplication } from './application/listTradersApplication';
 import { RiskRankingApplication } from './application/riskRankingApplication';
 import { EntrySignalApplication } from './application/entrySignalApplication';
 import { SafeCohortConsensusApplication } from './application/safeCohortConsensusApplication';
 import { TraderDetailApplication } from './application/traderDetailApplication';
 import { BacktestController } from './controller/backtestController';
+import { RecordedCoinController } from './controller/recordedCoinController';
 import { EntrySignalController } from './controller/entrySignalController';
 import { RiskRankingController } from './controller/riskRankingController';
 import { SafeCohortConsensusController } from './controller/safeCohortConsensusController';
@@ -16,6 +18,7 @@ import type { IPositionRepository } from './domain/interface/iPositionRepository
 import type { IPriceProxy } from './domain/interface/iPriceProxy';
 import type { ITraderRepository } from './domain/interface/iTraderRepository';
 import { BacktestEvaluatorService } from './domain/service/backtestEvaluatorService';
+import { RecordedCoinService } from './domain/service/recordedCoinService';
 import { EntrySignalService } from './domain/service/entrySignalService';
 import { RiskRankingService } from './domain/service/riskRankingService';
 import { SafeCohortConsensusService } from './domain/service/safeCohortConsensusService';
@@ -87,6 +90,13 @@ export function buildServer(
   entrySignalController.register(server);
 
   if (options.backtest !== undefined) {
+    const recordedCoinController = new RecordedCoinController(
+      new ListRecordedCoinsApplication(
+        new RecordedCoinService(options.backtest.consensusSnapshotRepository),
+      ),
+    );
+    recordedCoinController.register(server);
+
     const backtestController = new BacktestController(
       new BacktestApplication(
         options.backtest.consensusSnapshotRepository,
