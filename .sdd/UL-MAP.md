@@ -108,6 +108,7 @@ _Records business operations, function logic, and their corresponding business a
 | 回測評估 Backtest Evaluate | `backtestEvaluate` | 離線 job（非 HTTP） | 由歷史共識序列 + 前向價格算 forwardReturn/signalHitRate | 純 domain、可注入價格、產校準依據 |
 | 觸發回測 Run Backtest | `runBacktest`（`GET /backtest`，內部/受保護） | 內部呼叫 REST（**同步**） | 讀已累積共識歷史 + 抓對照價格 + 評估 + 回傳含 `dataAdequacy` 的報告 | experimental、非下單；不開 scheduler。**取代既有「回測無 HTTP 介面、離線 job」決定（B2 PRD `2026-06-20-entry-signal-backtest` 待後續對齊，本次不改）** |
 | 列出已記錄標的 List Recorded Coins | `listRecordedCoins`（`GET /coins`） | 使用者呼叫 REST API | 回傳 `consensus_snapshots` 中出現過的不重複 coin（升冪），作為 `/backtest` 的可查詢標的字典 | 公開、不需 token；跨 provider 合併（快照無 provider 維度） |
+| 列出標的覆蓋度 List Coin Coverage | `listCoinCoverage`（`GET /coins/coverage`） | 使用者呼叫 REST API | 回每 coin 的 `snapshotCount`／最早最晚 `capturedAt`／衍生 `spanMilliseconds`，依跨度由大到小排序——資料累積期的就緒度儀表 | 公開；span 最長 = 最接近 /backtest 的 adequate |
 
 ---
 
