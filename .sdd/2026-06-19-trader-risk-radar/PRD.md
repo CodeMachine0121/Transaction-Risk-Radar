@@ -158,6 +158,15 @@ synchronizeLeaderboard ──▶ traders
    - `riskRanking` 預設由低到高（安全在前）；可切換 `descending`（黑名單）。
    - 已平倉位數 < `minimumClosedPositions`（預設 20）→ 標記 `insufficientData`，不給 `riskScore`、不納入排行主體。
 
+9. **計算範圍與邊界口徑（口徑釐清，與實作對齊）**
+
+   前述各因子的「樣本集合」並非單一，依因子性質分為兩種；以下明確釘定，避免文件與實作漂移。
+
+   - **時間窗只套用在三項結算型指標**：`realizedProfitAndLoss`、`winRate`、`returnDownsideDeviation` 採「近 90 天**已平倉位**」（規則 3／4 的口徑）。
+   - **MAE、攤平比例、平均槓桿不套用時間窗**，且**涵蓋當前仍未平倉的倉位**：只要該倉位曾被觀測到（至少一筆 snapshot）即納入分母。理由——MAE 與槓桿衡量的是「扛單行為」，當前未平倉的深扛部位正是要捕捉的危險訊號，不應因尚未平倉而被排除。
+   - **平倉時間未知（`closedAt` 為 null）的已平倉位，保守視為落在時間窗內、不靜默丟棄**。理由——抓取窗常從持倉中途開始，平倉時間偶有缺漏；寧可納入計算也不無聲剔除樣本（避免低估風險）。代價是可能納入少量窗外舊倉位、輕微稀釋時效性，屬可接受取捨。
+   - **`riskScoreTier`（精度分層）**：上述公式為 `tier = position`（逐筆部位級，精準）。當部位級資料不足、改以帳戶級彙總（leaderboard 報酬序列 + winRatio）粗估時為 `tier = account`——以**帳戶最大回撤**代替 MAE，且**無法測得攤平與槓桿（權重項以 0 計）**。account-tier 的完整口徑見 `.sdd/2026-06-20-account-level-risk-fallback/PRD.md`；**唯有 `tier = position` 的交易員可進入安全群共識**（見 safe-cohort-consensus）。
+
 ### Data Ingestion & 倉位重建（資料來源拆分）
 
 指標所需資料來自**兩條 Hyperliquid 來源**，於 repository 層按「交易員 × 標的（coin）」join：
