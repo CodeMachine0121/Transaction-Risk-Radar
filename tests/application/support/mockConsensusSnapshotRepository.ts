@@ -10,4 +10,5 @@ export const createMockConsensusSnapshotRepository = (): IConsensusSnapshotRepos
   loadConsensusSeries: vi
     .fn<(coin: string, since: number) => Promise<ConsensusSnapshotPoint[]>>()
     .mockResolvedValue([]),
+  listRecordedCoins: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
 });

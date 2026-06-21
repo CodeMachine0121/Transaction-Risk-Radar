@@ -7,4 +7,6 @@ export interface IConsensusSnapshotRepository {
   saveConsensusSnapshots(records: ConsensusSnapshotRecord[]): Promise<void>;
   /** 載入某 coin 自 `since`（ms epoch）起、依時間遞增的共識時序，供回測。 */
   loadConsensusSeries(coin: string, since: number): Promise<ConsensusSnapshotPoint[]>;
+  /** 列出有共識紀錄的不重複 coin（排序由呼叫端決定）。 */
+  listRecordedCoins(): Promise<string[]>;
 }

@@ -43,4 +43,12 @@ export class ConsensusSnapshotRepository implements IConsensusSnapshotRepository
       capturedAt: row.capturedAt.getTime(),
     }));
   }
+
+  async listRecordedCoins(): Promise<string[]> {
+    const rows = await this.prismaClient.consensusSnapshot.findMany({
+      distinct: ['coin'],
+      select: { coin: true },
+    });
+    return rows.map((row) => row.coin);
+  }
 }
