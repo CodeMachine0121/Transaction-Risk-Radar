@@ -95,13 +95,16 @@ bun run dev                            # REST API (watch)
 | `GET` | `/consensus` | Position consensus of the safe cohort (low-risk traders) |
 | `GET` | `/consensus/:coin` | Consensus for a given coin; 404 if none qualifies |
 | `GET` | `/signals` | Entry signals derived from safe-cohort consensus (experimental, **not order instructions**) |
+| `GET` | `/backtest` | **Internal / protected**: per-coin signal backtest (hit rate / forward return + data adequacy), synchronous, experimental, **not order instructions** |
 
 **Common query parameters**
 
 - `/rankings`: `provider`, `direction` (`ascending` / `descending`), `offset`, `limit`
 - `/consensus`, `/signals`: `provider`, `weighting` (`equal` / `conviction`), `maxRiskScore` (0–100), `minParticipants` (≥1), `offset`, `limit`
+- `/backtest`: `coin` (**required**), `since` (ms epoch, default 0 = all history), `horizonsHours` (comma-separated hours e.g. `4,24,72`, overrides the env default)
 
 > Traders with too few closed positions are flagged `insufficientData` and given no `riskScore`.
+> `/backtest` is internal: when `BACKTEST_API_TOKEN` is set, requests must carry a matching `x-internal-token` header (otherwise 401); horizons default to `BACKTEST_HORIZONS_HOURS`. Each horizon carries a `dataAdequacy` level (most coin × horizon cells will read `insufficient` until enough history accrues).
 > A Postman collection is available under [`postman/`](./postman/).
 
 ---

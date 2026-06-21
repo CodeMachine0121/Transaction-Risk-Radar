@@ -95,13 +95,16 @@ bun run dev                            # REST API（watch）
 | `GET` | `/consensus` | 安全群（低風險交易員）持倉共識 |
 | `GET` | `/consensus/:coin` | 指定幣種的共識；無合格共識回 404 |
 | `GET` | `/signals` | 由安全群共識導出的進場訊號（experimental，**非下單指令**） |
+| `GET` | `/backtest` | **內部／受保護**：某 coin 的訊號回測（命中率／前向報酬 + 資料充足度），同步、experimental、**非下單指令** |
 
 **常用查詢參數**
 
 - `/rankings`：`provider`、`direction`（`ascending`／`descending`）、`offset`、`limit`
 - `/consensus`、`/signals`：`provider`、`weighting`（`equal`／`conviction`）、`maxRiskScore`（0–100）、`minParticipants`（≥1）、`offset`、`limit`
+- `/backtest`：`coin`（**必填**）、`since`（ms epoch，預設 0=全部）、`horizonsHours`（逗號小時清單如 `4,24,72`，覆蓋 env 預設）
 
 > 已平倉位數不足者標記 `insufficientData`、不給 `riskScore`。
+> `/backtest` 為內部端點：設 `BACKTEST_API_TOKEN` 後須帶相符的 `x-internal-token` 標頭（否則 401）；視窗預設由 `BACKTEST_HORIZONS_HOURS` 設定。每筆 horizon 帶 `dataAdequacy` 分級（多數 coin × horizon 因資料尚淺會顯示 `insufficient`）。
 > Postman collection 見 [`postman/`](./postman/)。
 
 ---

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Trader Risk Radar",
-    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n**風險評分分級（tier，每筆回應皆帶）：**\n- `position`：部位級（精準版）——逐筆部位重建，含 MAE/攤平/槓桿等完整指標；唯一會出現在 /rankings 的等級。\n- `account`：帳戶級（粗版 fallback）——當逐筆部位抓不到（如 OKX 私密帶單員回 60004）但來源提供帳戶彙總（累積報酬曲線 + winRatio）時，以「每期報酬下行標準差 + 帳戶回撤 + 陷阱訊號」估算；**排除於 /rankings**，僅在 /traders 顯示。此級別 MAE/averagingDownRatio/averageLeverage/realizedProfitAndLoss 為 null。\n\n**安全群持倉共識（/consensus）：** 在 riskScore 判定為相對安全可跟的群體（tier=position、非 insufficientData、riskScore ≤ maxRiskScore）中，聚合**當前未平倉**方向。`weighting=conviction`（預設）以「部位 conviction 佔比」加權、降權持有大量 coin 的分散巨鯨；`weighting=equal` 回退每人一票。每個 coin 回傳 net/conviction 兩種方向偏向、consensusStrength、分散度（average/maxConvictionShare）、人數、平均槓桿 + 免責。**描述性，非買賣建議、非價格預測。** 僅 tier=position 參與（OKX account-tier 結構性排除）。\n\n**進場訊號（/signals，EXPERIMENTAL）：** 把共識經規則導出每 coin 的 lean/verdict/setupQuality/reasons 決策輔助。**非下單指令、非倉位建議、非獲利保證；規則預測力尚待回測驗證。** 獨立 opt-in 端點，帶 experimental 旗標與重免責。\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。\n- `accountTierAddress`：一個 OKX 帳戶級（tier=account）交易員的 uniqueCode，供示範 fallback。\n- `coin`：共識查詢的標的（如 BTC / ETH），用於 /consensus/:coin。",
+    "description": "多資料源（Hyperliquid + OKX）交易員風險分析 + 排行 REST API。\n\n交易員以 (provider, address) 唯一識別；多數端點支援 `?provider=hyperliquid|okx` 篩選。\n\n**風險評分分級（tier，每筆回應皆帶）：**\n- `position`：部位級（精準版）——逐筆部位重建，含 MAE/攤平/槓桿等完整指標；唯一會出現在 /rankings 的等級。\n- `account`：帳戶級（粗版 fallback）——當逐筆部位抓不到（如 OKX 私密帶單員回 60004）但來源提供帳戶彙總（累積報酬曲線 + winRatio）時，以「每期報酬下行標準差 + 帳戶回撤 + 陷阱訊號」估算；**排除於 /rankings**，僅在 /traders 顯示。此級別 MAE/averagingDownRatio/averageLeverage/realizedProfitAndLoss 為 null。\n\n**安全群持倉共識（/consensus）：** 在 riskScore 判定為相對安全可跟的群體（tier=position、非 insufficientData、riskScore ≤ maxRiskScore）中，聚合**當前未平倉**方向。`weighting=conviction`（預設）以「部位 conviction 佔比」加權、降權持有大量 coin 的分散巨鯨；`weighting=equal` 回退每人一票。每個 coin 回傳 net/conviction 兩種方向偏向、consensusStrength、分散度（average/maxConvictionShare）、人數、平均槓桿 + 免責。**描述性，非買賣建議、非價格預測。** 僅 tier=position 參與（OKX account-tier 結構性排除）。\n\n**進場訊號（/signals，EXPERIMENTAL）：** 把共識經規則導出每 coin 的 lean/verdict/setupQuality/reasons 決策輔助。**非下單指令、非倉位建議、非獲利保證；規則預測力尚待回測驗證。** 獨立 opt-in 端點，帶 experimental 旗標與重免責。\n\n**回測（/backtest，內部／受保護、EXPERIMENTAL）：** 對某 coin 讀已累積的共識時序 + 抓對照價格，**同步**算各 horizon 的方向命中率／前向報酬，並按 coin × horizon 標註資料充足度（dataAdequacy）。設了 `BACKTEST_API_TOKEN` 時須帶相符的 `x-internal-token` 標頭，否則 401。**非下單指令、供人工校準門檻用；多數 coin × horizon 會誠實顯示資料不足。**\n\n變數：\n- `baseUrl`：API 位址，預設 http://localhost:3000\n- `provider`：來源（hyperliquid / okx）\n- `traderAddress`：交易員識別（Hyperliquid 為 0x 地址；OKX 為 lead trader uniqueCode）。請替換為 /traders 或 /rankings 回傳的實際值。\n- `accountTierAddress`：一個 OKX 帳戶級（tier=account）交易員的 uniqueCode，供示範 fallback。\n- `coin`：共識查詢的標的（如 BTC / ETH），用於 /consensus/:coin 與 /backtest。\n- `backtestToken`：/backtest 的內部 token（對應伺服器 BACKTEST_API_TOKEN）；未設保護則可留空。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,7 +9,8 @@
     { "key": "provider", "value": "hyperliquid", "type": "string" },
     { "key": "traderAddress", "value": "0A3CF5287316F730", "type": "string" },
     { "key": "accountTierAddress", "value": "0A3CF5287316F730", "type": "string" },
-    { "key": "coin", "value": "BTC", "type": "string" }
+    { "key": "coin", "value": "BTC", "type": "string" },
+    { "key": "backtestToken", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -212,6 +213,46 @@
           ]
         },
         "description": "同 Entry Signals，但帶 querystring（與 /consensus 共用解析；非法參數回 400）。EXPERIMENTAL，非投資建議。"
+      },
+      "response": []
+    },
+    {
+      "name": "Backtest (internal, experimental)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-internal-token", "value": "{{backtestToken}}", "description": "內部 token；伺服器設了 BACKTEST_API_TOKEN 時必填，否則回 401。未設保護則此標頭可忽略。" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/backtest?coin={{coin}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["backtest"],
+          "query": [
+            { "key": "coin", "value": "{{coin}}", "description": "必填：回測標的（如 BTC）。缺漏回 400。" }
+          ]
+        },
+        "description": "⚠️ **內部／受保護、EXPERIMENTAL／未經校準。非下單指令。** 對某 coin 讀已累積的共識時序 + 抓對照價格，**同步**算各 horizon 的方向命中率／前向報酬。\n\n保護：伺服器設了 `BACKTEST_API_TOKEN` 時，須帶相符的 `x-internal-token` 標頭（填入 `backtestToken` 變數），否則回 401。\n\n回應為 `{ coin, disclaimer, experimental: true, evaluatedSignalCount, horizons[] }`；每個 horizon 含：\n- `signalHitRate`（lean 與前向報酬同號比例）、`averageForwardReturn`\n- `sampleCount`（**重疊**樣本，高估上界）、`independentSampleEstimate`（非重疊窗的獨立樣本，信賴依據）\n- `dataAdequacy { level, reasons[] }`：每 coin × horizon 的充足度分級 insufficient / smoke-test / preliminary / adequate（依獨立樣本／日曆跨度／參與深度三軸，木桶短板）。\n\n未指定 horizons 時採伺服器 `BACKTEST_HORIZONS_HOURS` 預設（如 1,4,24 小時）。**多數 coin × horizon 會顯示 insufficient 屬正常——資料需累積數週至數月。**"
+      },
+      "response": []
+    },
+    {
+      "name": "Backtest (custom horizons)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-internal-token", "value": "{{backtestToken}}", "description": "內部 token；伺服器設了 BACKTEST_API_TOKEN 時必填。" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/backtest?coin={{coin}}&since=0&horizonsHours=4,24,72",
+          "host": ["{{baseUrl}}"],
+          "path": ["backtest"],
+          "query": [
+            { "key": "coin", "value": "{{coin}}", "description": "必填：回測標的。" },
+            { "key": "since", "value": "0", "description": "選用：回看起點（ms epoch）；預設 0 = 全部歷史。負值或非數回 400。" },
+            { "key": "horizonsHours", "value": "4,24,72", "description": "選用：往後看多久對答案，逗號分隔小時清單。覆蓋伺服器 env 預設。含非正數／非數回 400。" }
+          ]
+        },
+        "description": "帶自訂評估視窗（小時、一串）與回看起點的回測。horizons 優先序：請求 > env BACKTEST_HORIZONS_HOURS > 程式預設。\n\n注意：horizon 越長，每次「對答案」吃掉越多時間，獨立樣本累積越慢——長 horizon 的 dataAdequacy 通常需數月才脫離 insufficient。"
       },
       "response": []
     }
