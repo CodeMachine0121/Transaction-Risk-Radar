@@ -96,6 +96,7 @@ bun run dev                            # REST API（watch）
 | `GET` | `/consensus/:coin` | 指定幣種的共識；無合格共識回 404 |
 | `GET` | `/signals` | 由安全群共識導出的進場訊號（experimental，**非下單指令**） |
 | `GET` | `/coins` | 有共識紀錄的標的清單 `{ coins: [] }`（`/backtest` 的可查詢標的字典） |
+| `GET` | `/coins/coverage` | 各 coin 的共識覆蓋度（筆數、最早／最晚時間、跨度），依跨度排序——`/backtest` 就緒度儀表 |
 | `GET` | `/backtest` | **內部／受保護**：某 coin 的訊號回測（命中率／前向報酬 + 資料充足度），同步、experimental、**非下單指令** |
 
 **常用查詢參數**

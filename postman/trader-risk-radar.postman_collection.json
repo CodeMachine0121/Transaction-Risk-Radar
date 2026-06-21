@@ -227,6 +227,16 @@
       "response": []
     },
     {
+      "name": "Coin Coverage",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/coins/coverage", "host": ["{{baseUrl}}"], "path": ["coins", "coverage"] },
+        "description": "各 coin 的共識覆蓋度，回 `{ coins: [{ coin, snapshotCount, earliestCapturedAt, latestCapturedAt, spanMilliseconds }] }`，依 `spanMilliseconds` 由大到小排序。\n這是 /backtest 的「就緒度儀表」——span 越長代表共識歷史越久、1h horizon 的獨立樣本越多、越接近 dataAdequacy 的 adequate。時間為 ms epoch。\n公開端點、不需 token；無紀錄時回 `{ coins: [] }`。"
+      },
+      "response": []
+    },
+    {
       "name": "Backtest (internal, experimental)",
       "request": {
         "method": "GET",
