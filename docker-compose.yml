@@ -9,7 +9,8 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # bind mount 到專案內 ./data/postgres（已被 .gitignore 忽略）
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d trader_risk_radar']
       interval: 5s
@@ -106,5 +107,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres-data:
+  # postgres 改用 bind mount（./data/postgres），不再用具名 volume
   redis-data:

@@ -583,3 +583,5 @@ MigrationBackup/
 .ionide/
 
 # End of https://www.toptal.com/developers/gitignore/api/node,intellij+all,vs
+# Docker bind-mount 的本機資料庫資料（postgres data dir）—不進版控
+/data/
