@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyCors from '@fastify/cors';
 import { BacktestApplication } from './application/backtestApplication';
 import { ListCoinCoverageApplication } from './application/listCoinCoverageApplication';
 import { ListRecordedCoinsApplication } from './application/listRecordedCoinsApplication';
@@ -58,6 +59,9 @@ export function buildServer(
   options: BuildServerOptions = {},
 ): FastifyInstance {
   const server = Fastify({ logger: options.logger ?? false });
+
+  // 允許任何來源（IP/網域）的跨來源請求。
+  server.register(fastifyCors, { origin: true });
 
   server.get('/health', () => ({ status: 'ok' }));
 
